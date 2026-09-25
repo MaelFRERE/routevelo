@@ -1,4 +1,4 @@
-# RouteVelo V11
+# RouteVelo V12
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -35,3 +35,11 @@ Quand `APP_PASSWORD` est défini, toutes les pages et toutes les API RouteVelo s
 - Boulangeries : API Recherche d'entreprises / SIRENE.
 
 Les POI sont filtrés à 400 m maximum du tracé. Les cimetières sont indiqués comme **eau potentielle à vérifier**, et non comme eau potable confirmée.
+
+
+## V12 — mobile
+
+- Mode visible simplifié : Départ → arrivée uniquement.
+- Les trois propositions d’itinéraire sont affichées simultanément sur mobile.
+- Filtres déplacés en haut à droite sur mobile.
+- Bouton flottant ↶ pour annuler la dernière modification d’un point.

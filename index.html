@@ -370,7 +370,8 @@
     .poi-map-icon.bakery { box-shadow: 0 0 0 2px rgba(199,120,23,.45), 0 3px 10px rgba(0,0,0,.22); }
     .poi-map-icon.cemetery { box-shadow: 0 0 0 2px rgba(40,121,201,.32), 0 3px 10px rgba(0,0,0,.22); }
 
-    .mobile-menu-btn, .mobile-close-btn, .mobile-overlay { display: none; }
+    .mobile-menu-btn, .mobile-close-btn, .mobile-overlay, .map-undo-btn { display: none; }
+    .map-undo-btn:disabled { opacity: .42; cursor: default; }
     .logout-link { display: inline-flex; margin-top: 10px; color: var(--muted); font-size: 12px; text-decoration: none; }
     .logout-link:hover { color: var(--accent-2); }
 
@@ -470,15 +471,50 @@
       .map-summary-actions { display: grid; grid-template-columns: 1fr auto; min-width: 0; gap: 6px; margin-top: 6px; }
       .summary-status { min-width: 0; padding: 7px 8px; font-size: 10px; max-height: 48px; overflow: auto; }
       .gpx-map-btn { width: auto; min-height: 44px; padding: 8px 11px; }
-      .route-choices { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 1px; }
-      .route-choice { flex: 0 0 118px; padding: 7px 8px; scroll-snap-align: start; }
-      .route-choice-meta { font-size: 10px; }
+      .route-choices {
+        position: fixed;
+        z-index: 1080;
+        top: calc(max(12px, env(safe-area-inset-top)) + 154px);
+        left: 8px;
+        right: 8px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        padding: 6px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: rgba(255,255,255,.96);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+      }
+      .route-choice { min-width: 0; padding: 8px 7px; }
+      .route-choice-title { font-size: 11px; }
+      .route-choice-meta { font-size: 9px; white-space: normal; line-height: 1.25; }
+
+      .map-undo-btn {
+        display: grid;
+        place-items: center;
+        position: absolute;
+        z-index: 905;
+        top: calc(max(12px, env(safe-area-inset-top)) + 56px);
+        left: 12px;
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: rgba(255,255,255,.97);
+        color: var(--text);
+        box-shadow: var(--shadow);
+        font-size: 25px;
+        font-weight: 850;
+      }
 
       .filter-panel {
         right: 8px;
-        bottom: calc(max(8px, env(safe-area-inset-bottom)) + 132px);
+        top: max(12px, env(safe-area-inset-top));
+        bottom: auto;
         width: 194px;
-        max-width: calc(100% - 16px);
+        max-width: calc(100% - 150px);
         border-radius: 13px;
       }
       .filter-panel.collapsed { width: 126px; }
@@ -497,7 +533,6 @@
       .sidebar { width: min(94vw, 370px); padding-left: 14px; padding-right: 14px; }
       .grid2 { grid-template-columns: minmax(0, 1fr) auto; }
       .map-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-      .filter-panel { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 128px); }
       .summary-status { display: none; }
       .map-summary-actions { display: flex; justify-content: flex-end; }
       .gpx-map-btn { width: 100%; }
@@ -517,8 +552,8 @@
       </div>
 
       <section class="section stack">
-        <div class="section-title">Type de trajet</div>
-        <div class="segmented" aria-label="Type de trajet">
+        <div class="section-title">Itinéraire</div>
+        <div class="segmented hidden" aria-label="Type de trajet">
           <button id="modeAB" type="button" class="active">Départ → arrivée</button>
           <button id="modeLoop" type="button">Boucle</button>
         </div>
@@ -574,6 +609,7 @@
 
     <section class="map-wrap">
       <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Ouvrir les réglages">☰ Itinéraire</button>
+      <button id="undoMapBtn" class="map-undo-btn" type="button" aria-label="Annuler la dernière modification" title="Annuler" disabled>↶</button>
       <div id="map" aria-label="Carte de planification d’itinéraire"></div>
       <div class="map-summary" aria-live="polite">
         <div id="routeChoices" class="route-choices hidden" aria-label="Choix de l’itinéraire"></div>
@@ -654,6 +690,7 @@
         descendStat: document.getElementById('descendStat'),
         surfaceStatus: document.getElementById('surfaceStatus'),
         gpxBtn: document.getElementById('gpxBtn'),
+        undoMapBtn: document.getElementById('undoMapBtn'),
         filterPanel: document.getElementById('filterPanel'),
         filterToggleBtn: document.getElementById('filterToggleBtn'),
         filterBody: document.getElementById('filterBody'),
@@ -663,6 +700,7 @@
       const state = {
         mode: 'ab',
         waypoints: [],
+        waypointHistory: [],
         markers: [],
         routeLayer: null,
         currentLocationLayer: L.layerGroup(),
@@ -762,6 +800,25 @@
         });
       }
 
+      function updateUndoButton() {
+        if (els.undoMapBtn) els.undoMapBtn.disabled = state.waypointHistory.length === 0;
+      }
+
+      function rememberWaypoints() {
+        state.waypointHistory.push(state.waypoints.map(p => ({ ...p })));
+        if (state.waypointHistory.length > 20) state.waypointHistory.shift();
+        updateUndoButton();
+      }
+
+      function undoLastWaypointChange() {
+        if (!state.waypointHistory.length) return;
+        state.waypoints = state.waypointHistory.pop().map(p => ({ ...p }));
+        updateUndoButton();
+        refreshWaypointMarkers();
+        clearRouteOnly();
+        if (canRoute()) scheduleRecalc();
+      }
+
       function refreshWaypointMarkers() {
         state.markers.forEach(m => map.removeLayer(m));
         state.markers = [];
@@ -769,6 +826,7 @@
           const marker = L.marker([wp.lat, wp.lng], { draggable: true, icon: markerIcon(i), autoPan: true }).addTo(map);
           marker.on('dragend', () => {
             const p = marker.getLatLng();
+            rememberWaypoints();
             state.waypoints[i] = { lat: p.lat, lng: p.lng };
             renderWaypointList();
             scheduleRecalc();
@@ -785,6 +843,7 @@
           row.className = 'waypoint-row';
           row.innerHTML = `<span class="waypoint-index">${i + 1}</span><span class="coord">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</span><button type="button" class="icon-btn" aria-label="Supprimer le point ${i + 1}">✕</button>`;
           row.querySelector('button').addEventListener('click', () => {
+            rememberWaypoints();
             state.waypoints.splice(i, 1);
             refreshWaypointMarkers();
             clearRouteOnly();
@@ -816,6 +875,8 @@
 
       function clearAll() {
         state.waypoints = [];
+        state.waypointHistory = [];
+        updateUndoButton();
         state.markers.forEach(m => map.removeLayer(m));
         state.markers = [];
         clearRouteOnly();
@@ -828,6 +889,7 @@
 
       function addPoint(latlng) {
         const wp = { lat: latlng.lat, lng: latlng.lng };
+        rememberWaypoints();
         if (state.mode === 'ab') {
           if (state.waypoints.length < 2) state.waypoints.push(wp);
           else state.waypoints.splice(state.waypoints.length - 1, 0, wp);
@@ -877,6 +939,7 @@
         try {
           setStatus('Recherche de l’adresse…');
           const p = await geocode(input.value);
+          rememberWaypoints();
           if (state.mode === 'ab') {
             if (position === 'start') {
               if (state.waypoints.length === 0) state.waypoints.push(p);
@@ -931,6 +994,7 @@
       }
 
       function applyCurrentLocationAsStart(p, accuracy) {
+        rememberWaypoints();
         state.currentLocation = { ...p, accuracy };
         showCurrentLocation(p, accuracy);
         if (state.mode === 'ab') {
@@ -1907,13 +1971,8 @@
       els.waterToggle.addEventListener('change', renderPois);
       els.bakeryToggle.addEventListener('change', renderPois);
       els.gpxBtn.addEventListener('click', downloadGpx);
-      els.undoBtn.addEventListener('click', () => {
-        if (!state.waypoints.length) return;
-        state.waypoints.pop();
-        refreshWaypointMarkers();
-        clearRouteOnly();
-        if (canRoute()) scheduleRecalc();
-      });
+      els.undoBtn.addEventListener('click', undoLastWaypointChange);
+      els.undoMapBtn.addEventListener('click', undoLastWaypointChange);
       els.clearBtn.addEventListener('click', clearAll);
       [els.startSearch, els.endSearch, els.loopSearch].forEach(input => {
         input.addEventListener('keydown', e => {
