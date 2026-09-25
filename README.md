@@ -1,4 +1,4 @@
-# RouteVelo V30
+# RouteVelo V31
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -181,3 +181,10 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Le contrôle strict du revêtement reste exécuté pour l'analyse et le type de route.
 - Un segment inconnu, un avertissement de surface ou une indisponibilité temporaire du contrôle ne bloque plus l'export.
 - Le GPX conserve le tracé actuellement sélectionné, ainsi que les POI activés.
+
+
+## V31 : profil interactif et points de passage plus lisibles
+
+- Le profil d’élévation est interactif : glisser la ligne verticale affiche la distance, l’altitude et la pente locale en %.
+- Un point rouge synchronisé apparaît sur la carte à l’endroit correspondant du parcours.
+- Les points de passage grossissent et affichent un halo rose pendant leur déplacement, puis une courte animation confirme le dépôt.

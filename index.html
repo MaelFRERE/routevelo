@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- RouteVelo V30 -->
+<!-- RouteVelo V31 -->
 <html lang="fr">
 <head>
   <!-- RouteVelo V26 -->
@@ -356,6 +356,35 @@
     .elevation-area { fill: url(#elevationGradient); opacity: .96; }
     .elevation-line { fill: none; stroke: var(--accent); stroke-width: 2.2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
     .elevation-baseline { stroke: #d7c8ea; stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .elevation-chart { cursor: ew-resize; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .elevation-cursor-line { stroke: #ef4444; stroke-width: 1.6; vector-effect: non-scaling-stroke; pointer-events: none; }
+    .elevation-cursor-dot { fill: #ef4444; stroke: #fff; stroke-width: 2.4; vector-effect: non-scaling-stroke; pointer-events: none; }
+    .elevation-cursor-handle { fill: #ef4444; stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+    .elevation-cursor-label-bg { fill: rgba(255,255,255,.96); stroke: #eadff5; stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
+    .elevation-cursor-label { fill: #4c1d95; font-size: 9px; font-weight: 850; pointer-events: none; }
+    .elevation-map-marker { background: transparent !important; border: 0 !important; }
+    .elevation-map-dot {
+      width: 20px; height: 20px; border-radius: 50%; background: #ef4444; border: 3px solid #fff;
+      box-shadow: 0 2px 8px rgba(239,68,68,.38), 0 0 0 4px rgba(239,68,68,.16);
+      transform-origin: center; animation: elevationMapPulse .9s ease-in-out infinite alternate;
+    }
+    @keyframes elevationMapPulse { from { transform: scale(.92); } to { transform: scale(1.08); } }
+
+    .waypoint-marker {
+      width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
+      background:#7c3aed; color:white; border:3px solid white; box-shadow:0 2px 9px rgba(0,0,0,.28);
+      font:800 13px system-ui; transform-origin:center; transition:transform .14s ease, box-shadow .14s ease, background .14s ease;
+    }
+    .waypoint-marker.is-selected {
+      transform: scale(1.24); background:#db2777;
+      box-shadow:0 0 0 8px rgba(219,39,119,.18), 0 5px 16px rgba(76,29,149,.28);
+    }
+    .waypoint-marker.just-dropped { animation: waypointDrop .42s cubic-bezier(.2,.9,.25,1); }
+    @keyframes waypointDrop {
+      0% { transform: scale(1.24); box-shadow:0 0 0 8px rgba(219,39,119,.18),0 5px 16px rgba(76,29,149,.28); }
+      55% { transform: scale(.90); box-shadow:0 0 0 3px rgba(124,58,237,.10),0 2px 8px rgba(0,0,0,.20); }
+      100% { transform: scale(1); box-shadow:0 2px 9px rgba(0,0,0,.28); }
+    }
 
     .roadtype-panel {
       min-width: 0;
@@ -791,7 +820,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V30
+      // RouteVelo V31
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -853,6 +882,7 @@
         routeDistanceCoords: [],
         routeEncoded: '',
         routeSafe: false,
+        elevationCursorMarker: null,
         routeOptions: [],
         selectedRouteOption: -1,
         poiLayers: { water: L.layerGroup(), cemetery: L.layerGroup(), bakery: L.layerGroup() },
@@ -913,7 +943,15 @@
         return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`;
       }
 
+      function clearElevationMapCursor() {
+        if (state.elevationCursorMarker) {
+          map.removeLayer(state.elevationCursorMarker);
+          state.elevationCursorMarker = null;
+        }
+      }
+
       function resetElevationProfile() {
+        clearElevationMapCursor();
         if (els.elevationPanel) els.elevationPanel.classList.add('hidden');
         if (els.elevationMeta) els.elevationMeta.textContent = '';
         if (els.elevationChart) {
@@ -921,15 +959,65 @@
         }
       }
 
+      function elevationSlopePercent(points, index) {
+        if (!points.length) return 0;
+        const a = points[Math.max(0, index - 2)];
+        const b = points[Math.min(points.length - 1, index + 2)];
+        const horizontalM = Math.max(1, (b.km - a.km) * 1000);
+        return (b.h - a.h) / horizontalM * 100;
+      }
+
+      function elevationPointAtKm(points, targetKm) {
+        if (targetKm <= points[0].km) return { ...points[0], index: 0 };
+        const lastIndex = points.length - 1;
+        if (targetKm >= points[lastIndex].km) return { ...points[lastIndex], index: lastIndex };
+        let lo = 1, hi = lastIndex;
+        while (lo < hi) {
+          const mid = Math.floor((lo + hi) / 2);
+          if (points[mid].km < targetKm) lo = mid + 1;
+          else hi = mid;
+        }
+        const b = points[lo], a = points[lo - 1];
+        const spanKm = Math.max(0.000001, b.km - a.km);
+        const t = Math.max(0, Math.min(1, (targetKm - a.km) / spanKm));
+        return {
+          km: a.km + (b.km - a.km) * t,
+          h: a.h + (b.h - a.h) * t,
+          coord: [a.coord[0] + (b.coord[0] - a.coord[0]) * t, a.coord[1] + (b.coord[1] - a.coord[1]) * t],
+          index: t < 0.5 ? lo - 1 : lo
+        };
+      }
+
+      function showElevationMapCursor(point) {
+        if (!point || !Array.isArray(point.coord)) return;
+        const latlng = [point.coord[1], point.coord[0]];
+        if (!state.elevationCursorMarker) {
+          state.elevationCursorMarker = L.marker(latlng, {
+            interactive: false,
+            keyboard: false,
+            zIndexOffset: 3000,
+            icon: L.divIcon({
+              className: 'elevation-map-marker',
+              html: '<div class="elevation-map-dot"></div>',
+              iconSize: [20, 20],
+              iconAnchor: [10, 10]
+            })
+          }).addTo(map);
+        } else {
+          state.elevationCursorMarker.setLatLng(latlng);
+        }
+      }
+
       function renderElevationProfile(sampled, heights) {
         if (!els.elevationChart || !els.elevationPanel || !Array.isArray(sampled) || sampled.length < 2) return;
+        clearElevationMapCursor();
         const n = Math.min(sampled.length, heights.length);
         const points = [];
         let distanceM = 0;
         for (let i = 0; i < n; i++) {
           if (i > 0) distanceM += coordDistanceM(sampled[i - 1], sampled[i]);
           const h = Number(heights[i]);
-          if (Number.isFinite(h)) points.push({ km: distanceM / 1000, h });
+          if (Number.isFinite(h)) points.push({ km: distanceM / 1000, h, coord: sampled[i] });
         }
         if (points.length < 2) { resetElevationProfile(); return; }
 
@@ -965,9 +1053,64 @@
           grid += `<text class="elevation-axis-label" x="${xx.toFixed(1)}" y="${H - 6}" text-anchor="middle">${tick.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km</text>`;
         }
 
-        els.elevationChart.innerHTML = `<defs><linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop><stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop></linearGradient></defs>${grid}<line class="elevation-baseline" x1="${left}" y1="${baseY}" x2="${W-right}" y2="${baseY}"></line><path class="elevation-area" d="${areaPath}"></path><polyline class="elevation-line" points="${linePoints}"></polyline>`;
-        els.elevationMeta.textContent = `${Math.round(rawMin)}–${Math.round(rawMax)} m · ${totalKm.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`;
+        const initialIndex = 0;
+        const initial = points[initialIndex];
+        const initialX = x(initial.km);
+        const initialY = y(initial.h);
+        els.elevationChart.innerHTML = `<defs><linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop><stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop></linearGradient></defs>${grid}<line class="elevation-baseline" x1="${left}" y1="${baseY}" x2="${W-right}" y2="${baseY}"></line><path class="elevation-area" d="${areaPath}"></path><polyline class="elevation-line" points="${linePoints}"></polyline><g id="elevationCursor"><line id="elevationCursorLine" class="elevation-cursor-line" x1="${initialX.toFixed(1)}" y1="${top}" x2="${initialX.toFixed(1)}" y2="${top + plotH}"></line><circle id="elevationCursorDot" class="elevation-cursor-dot" cx="${initialX.toFixed(1)}" cy="${initialY.toFixed(1)}" r="4.7"></circle><circle id="elevationCursorHandle" class="elevation-cursor-handle" cx="${initialX.toFixed(1)}" cy="${top + 3}" r="4.4"></circle><rect id="elevationCursorLabelBg" class="elevation-cursor-label-bg" x="${left + 5}" y="${top + 5}" width="126" height="17" rx="6"></rect><text id="elevationCursorLabel" class="elevation-cursor-label" x="${left + 12}" y="${top + 17}">0 km · ${Math.round(initial.h)} m · 0%</text></g>`;
+        els.elevationMeta.textContent = `Glisse sur le profil · ${Math.round(rawMin)}–${Math.round(rawMax)} m`;
         els.elevationPanel.classList.remove('hidden');
+
+        const cursorLine = els.elevationChart.querySelector('#elevationCursorLine');
+        const cursorDot = els.elevationChart.querySelector('#elevationCursorDot');
+        const cursorHandle = els.elevationChart.querySelector('#elevationCursorHandle');
+        const labelBg = els.elevationChart.querySelector('#elevationCursorLabelBg');
+        const label = els.elevationChart.querySelector('#elevationCursorLabel');
+        let dragging = false;
+
+        const updateCursor = clientX => {
+          const rect = els.elevationChart.getBoundingClientRect();
+          if (!rect.width) return;
+          const svgX = Math.max(left, Math.min(W - right, (clientX - rect.left) / rect.width * W));
+          const targetKm = (svgX - left) / plotW * totalKm;
+          const point = elevationPointAtKm(points, targetKm);
+          const cx = x(point.km);
+          const cy = y(point.h);
+          const slope = elevationSlopePercent(points, point.index);
+          const slopeText = `${slope >= 0 ? '+' : ''}${slope.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+          cursorLine.setAttribute('x1', cx.toFixed(1));
+          cursorLine.setAttribute('x2', cx.toFixed(1));
+          cursorDot.setAttribute('cx', cx.toFixed(1));
+          cursorDot.setAttribute('cy', cy.toFixed(1));
+          cursorHandle.setAttribute('cx', cx.toFixed(1));
+          const info = `${point.km.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km · ${Math.round(point.h)} m · ${slopeText}`;
+          label.textContent = info;
+          const labelWidth = Math.max(112, Math.min(160, 74 + info.length * 3.25));
+          let labelX = cx + 8;
+          if (labelX + labelWidth > W - right) labelX = cx - labelWidth - 8;
+          labelBg.setAttribute('x', Math.max(left + 2, labelX).toFixed(1));
+          labelBg.setAttribute('width', labelWidth.toFixed(1));
+          label.setAttribute('x', (Math.max(left + 2, labelX) + 7).toFixed(1));
+          els.elevationMeta.textContent = info;
+          showElevationMapCursor(point);
+        };
+
+        els.elevationChart.addEventListener('pointerdown', e => {
+          dragging = true;
+          try { els.elevationChart.setPointerCapture(e.pointerId); } catch (_) {}
+          updateCursor(e.clientX);
+          e.preventDefault();
+        });
+        els.elevationChart.addEventListener('pointermove', e => {
+          if (e.pointerType === 'mouse' || dragging) updateCursor(e.clientX);
+        });
+        const finish = e => {
+          if (!dragging) return;
+          dragging = false;
+          try { els.elevationChart.releasePointerCapture(e.pointerId); } catch (_) {}
+        };
+        els.elevationChart.addEventListener('pointerup', finish);
+        els.elevationChart.addEventListener('pointercancel', finish);
       }
 
       function resetRoadTypeBreakdown() {
@@ -1037,9 +1180,29 @@
       function markerIcon(i) {
         return L.divIcon({
           className: '',
-          html: `<div style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#7c3aed;color:white;border:3px solid white;box-shadow:0 2px 9px rgba(0,0,0,.28);font:800 13px system-ui">${i + 1}</div>`,
+          html: `<div class="waypoint-marker" data-waypoint-index="${i}">${i + 1}</div>`,
           iconSize: [30, 30], iconAnchor: [15, 15]
         });
+      }
+
+      function waypointMarkerNode(marker) {
+        const root = marker && marker.getElement ? marker.getElement() : null;
+        return root ? root.querySelector('.waypoint-marker') : null;
+      }
+
+      function animateWaypointSelected(marker, selected) {
+        const node = waypointMarkerNode(marker);
+        if (!node) return;
+        node.classList.toggle('is-selected', !!selected);
+      }
+
+      function animateWaypointDropped(marker) {
+        const node = waypointMarkerNode(marker);
+        if (!node) return;
+        node.classList.remove('is-selected', 'just-dropped');
+        void node.offsetWidth;
+        node.classList.add('just-dropped');
+        setTimeout(() => node.classList.remove('just-dropped'), 460);
       }
 
       function updateUndoButton() {
@@ -1068,12 +1231,23 @@
         state.markers = [];
         state.waypoints.forEach((wp, i) => {
           const marker = L.marker([wp.lat, wp.lng], { draggable: true, icon: markerIcon(i), autoPan: true }).addTo(map);
+          marker.on('dragstart', () => {
+            marker.setZIndexOffset(2500);
+            animateWaypointSelected(marker, true);
+          });
+          marker.on('drag', () => animateWaypointSelected(marker, true));
           marker.on('dragend', () => {
             const p = marker.getLatLng();
             rememberWaypoints();
             state.waypoints[i] = { lat: p.lat, lng: p.lng };
             renderWaypointList();
+            marker.setZIndexOffset(0);
+            animateWaypointDropped(marker);
             scheduleRecalc();
+          });
+          marker.on('click', () => {
+            animateWaypointSelected(marker, true);
+            setTimeout(() => animateWaypointSelected(marker, false), 360);
           });
           state.markers.push(marker);
         });
