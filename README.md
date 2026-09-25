@@ -142,3 +142,12 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Cache serveur des géocodages et réponses Valhalla identiques.
 - Compression gzip des réponses et revalidation ETag des fichiers statiques.
 - Génération de boucles avec arrêt anticipé quand trois bonnes propositions sont déjà disponibles.
+
+## V26 - Profil d'elevation
+
+- suppression du bouton visible de retour en arriere sur la carte ;
+- ajout d'un profil d'elevation leger sous le bouton GPX ;
+- courbe altitude/distance dessinee en SVG sans bibliotheque graphique supplementaire ;
+- affichage des altitudes min/max et de la distance du profil ;
+- le profil se met a jour automatiquement quand l'itineraire selectionne change ;
+- interface mobile adaptee avec un graphique plus compact.

@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <!-- RouteVelo V25 -->
+  <!-- RouteVelo V26 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="25" />
+  <meta name="routevelo-version" content="26" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -317,6 +317,30 @@
     .summary-status { flex: 1 1 auto; min-width: 0; padding: 8px 10px; }
     .gpx-map-btn { flex: 1 1 auto; min-height: 40px; white-space: nowrap; }
 
+    .elevation-panel {
+      min-width: 0;
+      padding: 10px 10px 7px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #fff 0%, #fbf8ff 100%);
+      overflow: hidden;
+    }
+    .elevation-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 5px;
+    }
+    .elevation-title { font-size: 12px; font-weight: 850; color: var(--text); }
+    .elevation-meta { color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .elevation-chart { display: block; width: 100%; height: 118px; overflow: visible; }
+    .elevation-grid { stroke: #e9def7; stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .elevation-axis-label { fill: #7b7088; font-size: 9px; font-weight: 650; }
+    .elevation-area { fill: url(#elevationGradient); opacity: .96; }
+    .elevation-line { fill: none; stroke: var(--accent); stroke-width: 2.2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+    .elevation-baseline { stroke: #d7c8ea; stroke-width: 1; vector-effect: non-scaling-stroke; }
+
     .filter-panel {
       position: absolute;
       right: 18px;
@@ -380,8 +404,7 @@
       font: 900 14px/1 system-ui, sans-serif; user-select: none;
     }
 
-    .mobile-menu-btn, .mobile-close-btn, .mobile-overlay, .map-undo-btn { display: none; }
-    .map-undo-btn:disabled { opacity: .42; cursor: default; }
+    .mobile-menu-btn, .mobile-close-btn, .mobile-overlay { display: none; }
     .logout-link { display: inline-flex; margin-top: 10px; color: var(--muted); font-size: 12px; text-decoration: none; }
     .logout-link:hover { color: var(--accent-2); }
 
@@ -483,6 +506,11 @@
       .map-summary-actions { display: block; min-width: 0; margin-top: 0; }
       .summary-status { display: none; }
       .gpx-map-btn { display: block; width: 100%; min-height: 44px; padding: 8px 11px; }
+      .elevation-panel { padding: 7px 7px 5px; border-radius: 10px; }
+      .elevation-chart { height: 92px; }
+      .elevation-head { margin-bottom: 2px; }
+      .elevation-title { font-size: 11px; }
+      .elevation-meta { font-size: 9px; }
       .route-choices {
         position: static;
         z-index: auto;
@@ -500,21 +528,6 @@
       .route-choice { min-width: 0; padding: 8px 7px; }
       .route-choice-title { font-size: 11px; }
       .route-choice-meta { font-size: 9px; white-space: normal; line-height: 1.25; }
-
-      .map-undo-btn {
-        display: grid;
-        place-items: center;
-        width: 44px;
-        height: 44px;
-        margin: 8px 0 0 10px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: rgba(255,255,255,.97);
-        color: var(--text);
-        box-shadow: 0 1px 5px rgba(0,0,0,.18);
-        font-size: 25px;
-        font-weight: 850;
-      }
 
       .filter-panel {
         right: 8px;
@@ -545,7 +558,7 @@
       .gpx-map-btn { width: 100%; }
     }
 
-    /* V25 — DA rose/violet sobre + moins d'effets couteux a peindre. */
+    /* V26 — DA rose/violet sobre + profil d'élévation SVG léger. */
     h1 { letter-spacing: -.025em; }
     .brand-mark {
       background: linear-gradient(145deg, #f5edff, #fff0f8);
@@ -646,7 +659,6 @@
 
     <section class="map-wrap">
       <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Ouvrir les réglages">☰ Itinéraire</button>
-      <button id="undoMapBtn" class="map-undo-btn" type="button" aria-label="Annuler la dernière modification" title="Annuler" disabled>↶</button>
       <div id="map" aria-label="Carte de planification d’itinéraire"></div>
       <div class="map-summary" aria-live="polite">
         <div id="routeChoices" class="route-choices hidden" aria-label="Choix de l’itinéraire"></div>
@@ -660,6 +672,20 @@
           <div class="map-summary-actions">
             <button id="gpxBtn" class="btn btn-primary gpx-map-btn" type="button" disabled>Télécharger GPX</button>
           </div>
+        </div>
+        <div id="elevationPanel" class="elevation-panel hidden" aria-label="Profil d’élévation du parcours">
+          <div class="elevation-head">
+            <span class="elevation-title">Profil d’élévation</span>
+            <span id="elevationMeta" class="elevation-meta"></span>
+          </div>
+          <svg id="elevationChart" class="elevation-chart" viewBox="0 0 760 130" preserveAspectRatio="none" role="img" aria-label="Altitude selon la distance">
+            <defs>
+              <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop>
+                <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop>
+              </linearGradient>
+            </defs>
+          </svg>
         </div>
       </div>
 
@@ -722,7 +748,9 @@
         ascendStat: document.getElementById('ascendStat'),
         descendStat: document.getElementById('descendStat'),
         gpxBtn: document.getElementById('gpxBtn'),
-        undoMapBtn: document.getElementById('undoMapBtn'),
+        elevationPanel: document.getElementById('elevationPanel'),
+        elevationChart: document.getElementById('elevationChart'),
+        elevationMeta: document.getElementById('elevationMeta'),
         filterPanel: document.getElementById('filterPanel'),
         filterToggleBtn: document.getElementById('filterToggleBtn'),
         filterBody: document.getElementById('filterBody'),
@@ -760,14 +788,6 @@
 
       const map = L.map('map', { zoomControl: true, preferCanvas: true, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([46.6, 2.5], 6);
 
-      function positionUndoControl() {
-        if (window.innerWidth > 850) return;
-        const stack = document.querySelector('.leaflet-top.leaflet-left');
-        if (stack && els.undoMapBtn && els.undoMapBtn.parentElement !== stack) {
-          stack.appendChild(els.undoMapBtn);
-        }
-      }
-      setTimeout(positionUndoControl, 0);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         updateWhenIdle: true,
@@ -810,12 +830,70 @@
         return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`;
       }
 
+      function resetElevationProfile() {
+        if (els.elevationPanel) els.elevationPanel.classList.add('hidden');
+        if (els.elevationMeta) els.elevationMeta.textContent = '';
+        if (els.elevationChart) {
+          els.elevationChart.innerHTML = `<defs><linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop><stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop></linearGradient></defs>`;
+        }
+      }
+
+      function renderElevationProfile(sampled, heights) {
+        if (!els.elevationChart || !els.elevationPanel || !Array.isArray(sampled) || sampled.length < 2) return;
+        const n = Math.min(sampled.length, heights.length);
+        const points = [];
+        let distanceM = 0;
+        for (let i = 0; i < n; i++) {
+          if (i > 0) distanceM += coordDistanceM(sampled[i - 1], sampled[i]);
+          const h = Number(heights[i]);
+          if (Number.isFinite(h)) points.push({ km: distanceM / 1000, h });
+        }
+        if (points.length < 2) { resetElevationProfile(); return; }
+
+        const W = 760, H = 130;
+        const left = 36, right = 10, top = 8, bottom = 24;
+        const plotW = W - left - right, plotH = H - top - bottom;
+        const totalKm = Math.max(0.1, points[points.length - 1].km);
+        const rawMin = Math.min(...points.map(p => p.h));
+        const rawMax = Math.max(...points.map(p => p.h));
+        const span = Math.max(20, rawMax - rawMin);
+        const minH = Math.floor((rawMin - span * 0.08) / 10) * 10;
+        const maxH = Math.ceil((rawMax + span * 0.08) / 10) * 10;
+        const ySpan = Math.max(10, maxH - minH);
+        const x = km => left + (km / totalKm) * plotW;
+        const y = h => top + (1 - (h - minH) / ySpan) * plotH;
+        const linePoints = points.map(p => `${x(p.km).toFixed(1)},${y(p.h).toFixed(1)}`).join(' ');
+        const firstX = x(points[0].km).toFixed(1);
+        const lastX = x(points[points.length - 1].km).toFixed(1);
+        const baseY = (top + plotH).toFixed(1);
+        const areaPath = `M ${firstX} ${baseY} L ${linePoints.replaceAll(' ', ' L ')} L ${lastX} ${baseY} Z`;
+
+        const yTicks = [maxH, Math.round((maxH + minH) / 2), minH];
+        const xTicks = [0, totalKm / 2, totalKm];
+        let grid = '';
+        for (const tick of yTicks) {
+          const yy = y(tick);
+          grid += `<line class="elevation-grid" x1="${left}" y1="${yy.toFixed(1)}" x2="${W - right}" y2="${yy.toFixed(1)}"></line>`;
+          grid += `<text class="elevation-axis-label" x="${left - 5}" y="${(yy + 3).toFixed(1)}" text-anchor="end">${Math.round(tick)} m</text>`;
+        }
+        for (const tick of xTicks) {
+          const xx = x(tick);
+          grid += `<line class="elevation-grid" x1="${xx.toFixed(1)}" y1="${top}" x2="${xx.toFixed(1)}" y2="${top + plotH}"></line>`;
+          grid += `<text class="elevation-axis-label" x="${xx.toFixed(1)}" y="${H - 6}" text-anchor="middle">${tick.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km</text>`;
+        }
+
+        els.elevationChart.innerHTML = `<defs><linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop><stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop></linearGradient></defs>${grid}<line class="elevation-baseline" x1="${left}" y1="${baseY}" x2="${W-right}" y2="${baseY}"></line><path class="elevation-area" d="${areaPath}"></path><polyline class="elevation-line" points="${linePoints}"></polyline>`;
+        els.elevationMeta.textContent = `${Math.round(rawMin)}–${Math.round(rawMax)} m · ${totalKm.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`;
+        els.elevationPanel.classList.remove('hidden');
+      }
+
       function resetStats() {
         els.distanceStat.textContent = '—';
         els.timeStat.textContent = '—';
         els.ascendStat.textContent = '—';
         els.descendStat.textContent = '—';
         els.gpxBtn.disabled = true;
+        resetElevationProfile();
         state.routeSafe = false;
         state.routeCoords = [];
         state.routeDistanceCoords = [];
@@ -848,7 +926,6 @@
       }
 
       function updateUndoButton() {
-        if (els.undoMapBtn) els.undoMapBtn.disabled = state.waypointHistory.length === 0;
       }
 
       function rememberWaypoints() {
@@ -1277,6 +1354,7 @@
         els.timeStat.textContent = fmtTime(route.time);
         els.ascendStat.textContent = '…';
         els.descendStat.textContent = '…';
+        resetElevationProfile();
       }
 
       function renderLoopPreviews(routes) {
@@ -1434,10 +1512,12 @@
           }
           els.ascendStat.textContent = Math.round(up) + ' m';
           els.descendStat.textContent = Math.round(down) + ' m';
+          renderElevationProfile(sampled, heights);
         } catch (_) {
           if (serial === state.requestSerial) {
             els.ascendStat.textContent = '—';
             els.descendStat.textContent = '—';
+            resetElevationProfile();
           }
         }
       }
@@ -2415,7 +2495,6 @@
 
       // Sur mobile, ouvrir l'itineraire au premier affichage pour guider l'utilisateur.
       if (window.innerWidth <= 850) {
-        positionUndoControl();
         document.body.classList.add('mobile-panel-open');
         setTimeout(() => map.invalidateSize(), 260);
       }
@@ -2435,7 +2514,6 @@
       els.bakeryToggle.addEventListener('change', () => renderPois('all'));
       els.gpxBtn.addEventListener('click', downloadGpx);
       els.undoBtn.addEventListener('click', undoLastWaypointChange);
-      els.undoMapBtn.addEventListener('click', undoLastWaypointChange);
       els.clearBtn.addEventListener('click', clearAll);
       [els.startSearch, els.endSearch].forEach(input => {
         input.addEventListener('keydown', e => {
