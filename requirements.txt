@@ -1,0 +1,1 @@
+# RouteVelo utilise uniquement la bibliothèque standard Python.

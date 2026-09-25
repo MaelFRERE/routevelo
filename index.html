@@ -1,0 +1,1929 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>RouteVelo - planificateur vélo de route</title>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7f7;
+      --panel: #ffffff;
+      --text: #162421;
+      --muted: #63736f;
+      --line: #dce5e2;
+      --accent: #126b58;
+      --accent-2: #0b4e41;
+      --soft: #eaf4f1;
+      --warn: #946300;
+      --warn-bg: #fff7df;
+      --danger: #9e2e2e;
+      --danger-bg: #fff0f0;
+      --shadow: 0 14px 34px rgba(24, 56, 49, .10);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(315px, 390px) 1fr;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 22px;
+      overflow-y: auto;
+      z-index: 1000;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 23px;
+      background: var(--soft);
+      border: 1px solid #cde2dc;
+    }
+
+    h1 { margin: 0; font-size: 20px; }
+    .subtitle { color: var(--muted); font-size: 13px; margin-top: 3px; }
+
+    .section {
+      padding: 16px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .section:first-of-type { border-top: 0; padding-top: 0; }
+    .section-title { font-weight: 750; font-size: 14px; margin-bottom: 10px; }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stack { display: grid; gap: 8px; }
+
+    label { font-size: 12px; color: var(--muted); font-weight: 650; }
+    input[type="text"], input[type="password"], input[type="number"], select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 9px 11px;
+      color: var(--text);
+      background: white;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: #7db5a8;
+      box-shadow: 0 0 0 3px rgba(18, 107, 88, .10);
+    }
+
+    .btn {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 9px 12px;
+      background: white;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .btn:hover:not(:disabled) { background: #f8fbfa; }
+    .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-2); }
+    .btn-soft { background: var(--soft); border-color: #cfe2dd; color: var(--accent-2); }
+    .btn-danger { color: var(--danger); }
+    .full { width: 100%; }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 4px;
+      background: #f1f5f4;
+      border-radius: 13px;
+    }
+
+    .segmented button {
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 8px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 750;
+    }
+    .segmented button.active { background: white; color: var(--text); box-shadow: 0 2px 8px rgba(20,50,43,.08); }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 38px;
+    }
+
+    .toggle-label { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 14px; }
+    .toggle-label small { color: var(--muted); }
+
+    .switch { position: relative; width: 44px; height: 25px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; background: #cdd8d5; border-radius: 30px; transition: .2s; }
+    .slider:before { content: ""; position: absolute; height: 19px; width: 19px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .2s; box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider:before { transform: translateX(19px); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 11px;
+      background: #fbfcfc;
+    }
+    .stat strong { display: block; font-size: 18px; }
+    .stat span { color: var(--muted); font-size: 11px; }
+
+    .status {
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.45;
+      background: #f3f7f6;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .status.ok { background: var(--soft); border-color: #cfe2dd; color: var(--accent-2); }
+    .status.warn { background: var(--warn-bg); border-color: #ecd8a1; color: var(--warn); }
+    .status.error { background: var(--danger-bg); border-color: #efc5c5; color: var(--danger); }
+
+    .poi-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .pill { font-size: 11px; padding: 5px 8px; border-radius: 999px; background: #f2f5f4; border: 1px solid var(--line); }
+
+    .map-wrap { position: relative; min-width: 0; }
+    #map { width: 100%; height: 100vh; }
+
+    .map-tip {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      z-index: 700;
+      max-width: 390px;
+      background: rgba(255,255,255,.95);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      color: var(--muted);
+      backdrop-filter: blur(8px);
+    }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .dot.route { background: #126b58; }
+    .dot.water { background: #2879c9; }
+    .dot.bakery { background: #c77817; }
+    .dot.position { background: #2866d7; box-shadow: 0 0 0 3px rgba(40,102,215,.18); }
+
+    .location-row { display: grid; grid-template-columns: 1fr; gap: 7px; }
+    .location-help { color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+    .waypoint-list { display: grid; gap: 6px; margin-top: 8px; }
+    .waypoint-row { display: grid; grid-template-columns: 24px 1fr auto; gap: 7px; align-items: center; font-size: 12px; }
+    .waypoint-index { width: 24px; height: 24px; border-radius: 50%; display:grid; place-items:center; background: var(--soft); color: var(--accent-2); font-weight: 800; }
+    .coord { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    .icon-btn { border:0; background:transparent; color:var(--danger); padding:5px; border-radius:7px; }
+    .icon-btn:hover { background:var(--danger-bg); }
+
+    .note { color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .hidden { display: none !important; }
+
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.45); border-top-color: white; border-radius: 50%; display: inline-block; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 7px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .map-summary {
+      position: absolute;
+      left: 18px;
+      right: 302px;
+      bottom: 18px;
+      z-index: 750;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+      padding: 10px;
+      background: rgba(255,255,255,.96);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .route-choices {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .route-choice {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 8px 10px;
+      background: #f8faf9;
+      color: var(--text);
+      text-align: left;
+      transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+    }
+    .route-choice:hover { background: #f3f8f6; }
+    .route-choice.active {
+      border-color: #7db5a8;
+      background: var(--soft);
+      box-shadow: 0 0 0 2px rgba(18,107,88,.08);
+    }
+    .route-choice-title { display: block; font-size: 12px; font-weight: 850; }
+    .route-choice-meta { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .map-summary-main {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .map-summary-stats {
+      flex: 1 1 350px;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(64px, 1fr));
+      gap: 7px;
+    }
+
+    .summary-stat {
+      min-width: 0;
+      padding: 7px 9px;
+      border-radius: 10px;
+      background: #f7faf9;
+      border: 1px solid var(--line);
+    }
+    .summary-stat strong { display: block; font-size: 16px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .summary-stat span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+
+    .map-summary-actions {
+      flex: 1 1 300px;
+      min-width: 230px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .summary-status { flex: 1 1 auto; min-width: 0; padding: 8px 10px; }
+    .gpx-map-btn { flex: none; min-height: 40px; white-space: nowrap; }
+
+    .filter-panel {
+      position: absolute;
+      right: 18px;
+      bottom: 54px;
+      z-index: 760;
+      width: 264px;
+      max-width: calc(100% - 36px);
+      background: rgba(255,255,255,.97);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      transition: width .18s ease;
+    }
+    .filter-panel.collapsed { width: 154px; }
+    .filter-panel-head {
+      width: 100%;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 12px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+    }
+    .filter-panel-head:hover { background: #f8fbfa; }
+    .filter-panel-head span:first-child { min-width: 0; }
+    .filter-panel-head strong { display: block; font-size: 13px; }
+    .filter-panel-head small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .filter-panel.collapsed .filter-panel-head small { display: none; }
+    .filter-chevron { flex: none; width: 25px; height: 25px; display: grid; place-items: center; border-radius: 8px; background: var(--soft); color: var(--accent-2); font-weight: 900; }
+    .filter-body { padding: 2px 12px 12px; border-top: 1px solid var(--line); }
+    .filter-panel.collapsed .filter-body { display: none; }
+    .filter-body .toggle-row { min-height: 48px; }
+    .poi-symbol { width: 25px; height: 25px; display: grid; place-items: center; font-size: 19px; }
+
+    .poi-leaflet-icon { background: transparent !important; border: 0 !important; }
+    .poi-map-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(255,255,255,.98);
+      border: 2px solid white;
+      box-shadow: 0 2px 9px rgba(0,0,0,.28);
+      font-size: 20px;
+      line-height: 1;
+      user-select: none;
+    }
+    .poi-map-icon.water { box-shadow: 0 0 0 2px rgba(40,121,201,.45), 0 3px 10px rgba(0,0,0,.22); }
+    .poi-map-icon.bakery { box-shadow: 0 0 0 2px rgba(199,120,23,.45), 0 3px 10px rgba(0,0,0,.22); }
+    .poi-map-icon.cemetery { box-shadow: 0 0 0 2px rgba(40,121,201,.32), 0 3px 10px rgba(0,0,0,.22); }
+
+    .mobile-menu-btn, .mobile-close-btn, .mobile-overlay { display: none; }
+    .logout-link { display: inline-flex; margin-top: 10px; color: var(--muted); font-size: 12px; text-decoration: none; }
+    .logout-link:hover { color: var(--accent-2); }
+
+    @media (max-width: 1050px) {
+      .map-summary { right: 18px; bottom: 18px; }
+      .map-summary-main { flex-direction: column; }
+      .map-summary-actions { min-width: 0; flex-basis: auto; }
+      .filter-panel { bottom: 232px; }
+    }
+
+    @media (max-width: 850px) {
+      html, body { width: 100%; min-height: 100%; overflow: hidden; }
+      body.mobile-panel-open { overflow: hidden; }
+      .app { display: block; min-height: 100dvh; }
+      .map-wrap { height: 100dvh; min-height: 100dvh; }
+      #map { height: 100dvh; min-height: 100dvh; }
+
+      .sidebar {
+        position: fixed;
+        z-index: 1300;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: min(90vw, 390px);
+        max-height: none;
+        padding: max(18px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+        overflow-y: auto;
+        border-right: 1px solid var(--line);
+        border-bottom: 0;
+        box-shadow: 16px 0 45px rgba(24,56,49,.16);
+        transform: translateX(-105%);
+        transition: transform .22s ease;
+      }
+      body.mobile-panel-open .sidebar { transform: translateX(0); }
+      .mobile-overlay {
+        display: block;
+        position: fixed;
+        z-index: 1250;
+        inset: 0;
+        background: rgba(10,25,22,.30);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .2s ease;
+      }
+      body.mobile-panel-open .mobile-overlay { opacity: 1; pointer-events: auto; }
+      .mobile-menu-btn {
+        display: inline-flex;
+        position: absolute;
+        z-index: 900;
+        top: max(12px, env(safe-area-inset-top));
+        left: 12px;
+        min-height: 46px;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 13px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: rgba(255,255,255,.97);
+        color: var(--text);
+        box-shadow: var(--shadow);
+        font-weight: 800;
+      }
+      .mobile-close-btn {
+        display: grid;
+        place-items: center;
+        margin-left: auto;
+        width: 42px;
+        height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        color: var(--text);
+        font-size: 21px;
+      }
+      .brand { margin-bottom: 14px; }
+      .brand-mark { width: 40px; height: 40px; border-radius: 12px; }
+      .sidebar .btn, .sidebar input[type="text"], .sidebar input[type="number"] { min-height: 48px; }
+      .sidebar input[type="text"], .sidebar input[type="number"] { font-size: 16px; }
+      .segmented button { min-height: 46px; }
+      .location-help { display: none; }
+
+      .map-summary {
+        left: 8px;
+        right: 8px;
+        bottom: max(8px, env(safe-area-inset-bottom));
+        padding: 7px;
+        gap: 6px;
+        border-radius: 13px;
+        max-height: 35dvh;
+        overflow-y: auto;
+      }
+      .map-summary-main { display: block; }
+      .map-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+      .summary-stat { padding: 6px 5px; text-align: center; }
+      .summary-stat strong { font-size: 14px; }
+      .summary-stat span { font-size: 9px; }
+      .map-summary-actions { display: grid; grid-template-columns: 1fr auto; min-width: 0; gap: 6px; margin-top: 6px; }
+      .summary-status { min-width: 0; padding: 7px 8px; font-size: 10px; max-height: 48px; overflow: auto; }
+      .gpx-map-btn { width: auto; min-height: 44px; padding: 8px 11px; }
+      .route-choices { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 1px; }
+      .route-choice { flex: 0 0 118px; padding: 7px 8px; scroll-snap-align: start; }
+      .route-choice-meta { font-size: 10px; }
+
+      .filter-panel {
+        right: 8px;
+        bottom: calc(max(8px, env(safe-area-inset-bottom)) + 132px);
+        width: 194px;
+        max-width: calc(100% - 16px);
+        border-radius: 13px;
+      }
+      .filter-panel.collapsed { width: 126px; }
+      .filter-panel-head { min-height: 44px; padding: 8px 10px; }
+      .filter-panel-head small { display: none; }
+      .filter-body { padding: 2px 10px 10px; }
+      .filter-body .toggle-row { min-height: 44px; }
+      .toggle-label { font-size: 12px; gap: 6px; }
+      .toggle-label small { display: none; }
+      .poi-symbol { width: 22px; height: 22px; font-size: 17px; }
+      .poi-counts { display: none; }
+      .leaflet-control-zoom { margin-top: 66px !important; }
+    }
+
+    @media (max-width: 520px) {
+      .sidebar { width: min(94vw, 370px); padding-left: 14px; padding-right: 14px; }
+      .grid2 { grid-template-columns: minmax(0, 1fr) auto; }
+      .map-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .filter-panel { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 128px); }
+      .summary-status { display: none; }
+      .map-summary-actions { display: flex; justify-content: flex-end; }
+      .gpx-map-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">🚴</div>
+        <div>
+          <h1>RouteVelo</h1>
+          <div class="subtitle">Planificateur strict pour vélo de route</div>
+        </div>
+        <button id="mobileCloseBtn" class="mobile-close-btn" type="button" aria-label="Fermer les réglages">×</button>
+      </div>
+
+      <section class="section stack">
+        <div class="section-title">Type de trajet</div>
+        <div class="segmented" aria-label="Type de trajet">
+          <button id="modeAB" type="button" class="active">Départ → arrivée</button>
+          <button id="modeLoop" type="button">Boucle</button>
+        </div>
+
+        <div id="abControls" class="stack">
+          <label for="startSearch">Départ</label>
+          <div class="grid2">
+            <input id="startSearch" type="text" placeholder="Adresse ou ville" />
+            <button id="startSearchBtn" class="btn" type="button">Placer</button>
+          </div>
+          <div class="location-row">
+            <button id="useLocationBtn" class="btn btn-soft full" type="button">⌖ Utiliser ma position comme départ</button>
+            <div class="location-help">Le navigateur demandera l’autorisation d’utiliser la localisation de ce PC.</div>
+          </div>
+          <label for="endSearch">Arrivée</label>
+          <div class="grid2">
+            <input id="endSearch" type="text" placeholder="Adresse ou ville" />
+            <button id="endSearchBtn" class="btn" type="button">Placer</button>
+          </div>
+        </div>
+
+        <div id="loopControls" class="stack hidden">
+          <label for="loopSearch">Point de départ de la boucle</label>
+          <div class="grid2">
+            <input id="loopSearch" type="text" placeholder="Adresse ou ville" />
+            <button id="loopSearchBtn" class="btn" type="button">Placer</button>
+          </div>
+          <div class="location-row">
+            <button id="useLoopLocationBtn" class="btn btn-soft full" type="button">⌖ Démarrer la boucle depuis ma position</button>
+            <div class="location-help">La précision dépend du GPS, du Wi‑Fi et des services de localisation disponibles sur le PC.</div>
+          </div>
+          <label for="loopDistance">Distance moyenne cible</label>
+          <div class="grid2">
+            <input id="loopDistance" type="number" min="10" max="350" step="5" value="80" />
+            <button id="generateLoopBtn" class="btn btn-soft" type="button">Proposer 3 boucles</button>
+          </div>
+          <div class="note">Court ≈ 80 %, Moyen = distance saisie, Long ≈ 120 %. Les trois boucles sont générées automatiquement.</div>
+        </div>
+
+        <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer 3 itinéraires</button>
+      </section>
+
+      <a class="logout-link" href="/logout">Se déconnecter</a>
+
+      <div class="hidden" aria-hidden="true">
+        <div id="waypointList"></div>
+        <button id="undoBtn" type="button">Annuler dernier</button>
+        <button id="clearBtn" type="button">Tout effacer</button>
+      </div>
+
+    </aside>
+    <div id="mobileOverlay" class="mobile-overlay" aria-hidden="true"></div>
+
+    <section class="map-wrap">
+      <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Ouvrir les réglages">☰ Itinéraire</button>
+      <div id="map" aria-label="Carte de planification d’itinéraire"></div>
+      <div class="map-summary" aria-live="polite">
+        <div id="routeChoices" class="route-choices hidden" aria-label="Choix de l’itinéraire"></div>
+        <div class="map-summary-main">
+          <div class="map-summary-stats">
+            <div class="summary-stat"><strong id="distanceStat">—</strong><span>Distance</span></div>
+            <div class="summary-stat"><strong id="timeStat">—</strong><span>Temps</span></div>
+            <div class="summary-stat"><strong id="ascendStat">—</strong><span>D+</span></div>
+            <div class="summary-stat"><strong id="descendStat">—</strong><span>D−</span></div>
+          </div>
+          <div class="map-summary-actions">
+            <div id="surfaceStatus" class="status summary-status">Aucun itinéraire calculé.</div>
+            <button id="gpxBtn" class="btn btn-primary gpx-map-btn" type="button" disabled>Télécharger GPX</button>
+          </div>
+        </div>
+      </div>
+
+      <aside id="filterPanel" class="filter-panel" aria-label="Filtres de la carte">
+        <button id="filterToggleBtn" class="filter-panel-head" type="button" aria-expanded="true" aria-controls="filterBody">
+          <span><strong>Filtres</strong><small>Points utiles sur le trajet</small></span>
+          <span id="filterChevron" class="filter-chevron" aria-hidden="true">−</span>
+        </button>
+        <div id="filterBody" class="filter-body">
+          <div class="toggle-row">
+            <div class="toggle-label"><span class="poi-symbol">💧</span><span>Eau potable + cimetières<br><small>jusqu’à 400 m · cimetières = eau à vérifier</small></span></div>
+            <label class="switch"><input id="waterToggle" type="checkbox" checked /><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-label"><span class="poi-symbol">🥐</span><span>Boulangeries<br><small>jusqu’à 400 m · registre entreprises France</small></span></div>
+            <label class="switch"><input id="bakeryToggle" type="checkbox" checked /><span class="slider"></span></label>
+          </div>
+          <div class="poi-counts"><span id="waterCount" class="pill">0 point d’eau</span><span id="bakeryCount" class="pill">0 boulangerie</span></div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const API_BASE = '/api';
+      const MAX_POI_DISTANCE_M = 400;
+      const ALLOWED_USES = new Set(['road', 'ramp', 'turn_channel', 'cycleway', 'culdesac', 'service_road']);
+      const ALLOWED_SURFACES = new Set(['paved_smooth', 'paved']);
+
+      const els = {
+        modeAB: document.getElementById('modeAB'),
+        modeLoop: document.getElementById('modeLoop'),
+        abControls: document.getElementById('abControls'),
+        loopControls: document.getElementById('loopControls'),
+        startSearch: document.getElementById('startSearch'),
+        endSearch: document.getElementById('endSearch'),
+        loopSearch: document.getElementById('loopSearch'),
+        startSearchBtn: document.getElementById('startSearchBtn'),
+        endSearchBtn: document.getElementById('endSearchBtn'),
+        loopSearchBtn: document.getElementById('loopSearchBtn'),
+        useLocationBtn: document.getElementById('useLocationBtn'),
+        useLoopLocationBtn: document.getElementById('useLoopLocationBtn'),
+        loopDistance: document.getElementById('loopDistance'),
+        generateLoopBtn: document.getElementById('generateLoopBtn'),
+        calculateBtn: document.getElementById('calculateBtn'),
+        mobileMenuBtn: document.getElementById('mobileMenuBtn'),
+        mobileCloseBtn: document.getElementById('mobileCloseBtn'),
+        mobileOverlay: document.getElementById('mobileOverlay'),
+        routeChoices: document.getElementById('routeChoices'),
+        waypointList: document.getElementById('waypointList'),
+        undoBtn: document.getElementById('undoBtn'),
+        clearBtn: document.getElementById('clearBtn'),
+        waterToggle: document.getElementById('waterToggle'),
+        bakeryToggle: document.getElementById('bakeryToggle'),
+        waterCount: document.getElementById('waterCount'),
+        bakeryCount: document.getElementById('bakeryCount'),
+        distanceStat: document.getElementById('distanceStat'),
+        timeStat: document.getElementById('timeStat'),
+        ascendStat: document.getElementById('ascendStat'),
+        descendStat: document.getElementById('descendStat'),
+        surfaceStatus: document.getElementById('surfaceStatus'),
+        gpxBtn: document.getElementById('gpxBtn'),
+        filterPanel: document.getElementById('filterPanel'),
+        filterToggleBtn: document.getElementById('filterToggleBtn'),
+        filterBody: document.getElementById('filterBody'),
+        filterChevron: document.getElementById('filterChevron')
+      };
+
+      const state = {
+        mode: 'ab',
+        waypoints: [],
+        markers: [],
+        routeLayer: null,
+        currentLocationLayer: L.layerGroup(),
+        currentLocation: null,
+        routeCoords: [],
+        routeEncoded: '',
+        routeSafe: false,
+        routeOptions: [],
+        selectedRouteOption: -1,
+        poiLayers: { water: L.layerGroup(), cemetery: L.layerGroup(), bakery: L.layerGroup() },
+        pois: { water: [], cemetery: [], bakery: [] },
+        poiLoadingWater: false,
+        poiLoadingBakery: false,
+        poiLoadingCemetery: false,
+        poiWaterError: false,
+        poiBakeryError: false,
+        poiCemeteryError: false,
+        loopSeed: 0,
+        recalcTimer: null,
+        requestSerial: 0
+      };
+
+      const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      state.poiLayers.water.addTo(map);
+      state.poiLayers.cemetery.addTo(map);
+      state.poiLayers.bakery.addTo(map);
+      state.currentLocationLayer.addTo(map);
+
+      function setStatus(message, kind = '') {
+        els.surfaceStatus.textContent = message;
+        els.surfaceStatus.className = 'status' + (kind ? ' ' + kind : '');
+      }
+
+      function setBusy(button, busy, label) {
+        if (!button) return;
+        if (busy) {
+          button.dataset.original = button.textContent;
+          button.disabled = true;
+          button.innerHTML = '<span class="spinner"></span>' + label;
+        } else {
+          button.disabled = false;
+          button.textContent = button.dataset.original || label;
+          delete button.dataset.original;
+        }
+      }
+
+      function fmtKm(m) {
+        if (!Number.isFinite(m)) return '—';
+        return (m / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' km';
+      }
+
+      function fmtTime(ms) {
+        if (!Number.isFinite(ms)) return '—';
+        const totalMin = Math.max(1, Math.round(ms / 60000));
+        const h = Math.floor(totalMin / 60);
+        const m = totalMin % 60;
+        return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`;
+      }
+
+      function resetStats() {
+        els.distanceStat.textContent = '—';
+        els.timeStat.textContent = '—';
+        els.ascendStat.textContent = '—';
+        els.descendStat.textContent = '—';
+        els.gpxBtn.disabled = true;
+        state.routeSafe = false;
+        state.routeCoords = [];
+        state.routeEncoded = '';
+      }
+
+      function clearRouteChoices() {
+        state.routeOptions = [];
+        state.selectedRouteOption = -1;
+        els.routeChoices.innerHTML = '';
+        els.routeChoices.classList.add('hidden');
+      }
+
+      function switchMode(mode) {
+        state.mode = mode;
+        els.modeAB.classList.toggle('active', mode === 'ab');
+        els.modeLoop.classList.toggle('active', mode === 'loop');
+        els.abControls.classList.toggle('hidden', mode !== 'ab');
+        els.loopControls.classList.toggle('hidden', mode !== 'loop');
+        els.calculateBtn.classList.toggle('hidden', mode !== 'ab');
+        clearAll();
+      }
+
+      function markerIcon(i) {
+        return L.divIcon({
+          className: '',
+          html: `<div style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#126b58;color:white;border:3px solid white;box-shadow:0 2px 9px rgba(0,0,0,.28);font:800 13px system-ui">${i + 1}</div>`,
+          iconSize: [30, 30], iconAnchor: [15, 15]
+        });
+      }
+
+      function refreshWaypointMarkers() {
+        state.markers.forEach(m => map.removeLayer(m));
+        state.markers = [];
+        state.waypoints.forEach((wp, i) => {
+          const marker = L.marker([wp.lat, wp.lng], { draggable: true, icon: markerIcon(i), autoPan: true }).addTo(map);
+          marker.on('dragend', () => {
+            const p = marker.getLatLng();
+            state.waypoints[i] = { lat: p.lat, lng: p.lng };
+            renderWaypointList();
+            scheduleRecalc();
+          });
+          state.markers.push(marker);
+        });
+        renderWaypointList();
+      }
+
+      function renderWaypointList() {
+        els.waypointList.innerHTML = '';
+        state.waypoints.forEach((wp, i) => {
+          const row = document.createElement('div');
+          row.className = 'waypoint-row';
+          row.innerHTML = `<span class="waypoint-index">${i + 1}</span><span class="coord">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</span><button type="button" class="icon-btn" aria-label="Supprimer le point ${i + 1}">✕</button>`;
+          row.querySelector('button').addEventListener('click', () => {
+            state.waypoints.splice(i, 1);
+            refreshWaypointMarkers();
+            clearRouteOnly();
+            if (canRoute()) scheduleRecalc();
+          });
+          els.waypointList.appendChild(row);
+        });
+      }
+
+      function clearRouteOnly() {
+        if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
+        state.poiLayers.water.clearLayers();
+        state.poiLayers.cemetery.clearLayers();
+        state.poiLayers.bakery.clearLayers();
+        state.pois.water = [];
+        state.pois.cemetery = [];
+        state.pois.bakery = [];
+        state.poiLoadingWater = false;
+        state.poiLoadingBakery = false;
+        state.poiLoadingCemetery = false;
+        state.poiWaterError = false;
+        state.poiBakeryError = false;
+        state.poiCemeteryError = false;
+        updatePoiCounts();
+        resetStats();
+        clearRouteChoices();
+        setStatus('Aucun itinéraire calculé.');
+      }
+
+      function clearAll() {
+        state.waypoints = [];
+        state.markers.forEach(m => map.removeLayer(m));
+        state.markers = [];
+        clearRouteOnly();
+        renderWaypointList();
+      }
+
+      function canRoute() {
+        return state.waypoints.length >= 2;
+      }
+
+      function addPoint(latlng) {
+        const wp = { lat: latlng.lat, lng: latlng.lng };
+        if (state.mode === 'ab') {
+          if (state.waypoints.length < 2) state.waypoints.push(wp);
+          else state.waypoints.splice(state.waypoints.length - 1, 0, wp);
+        } else if (!state.routeOptions.length) {
+          // Avant génération d’une boucle, un clic sur la carte définit simplement le départ.
+          state.waypoints = [wp];
+          els.loopSearch.value = '';
+          clearRouteOnly();
+        } else {
+          // Après sélection d’une boucle, un clic ajoute un passage modifiable.
+          state.waypoints.push(wp);
+        }
+        refreshWaypointMarkers();
+        if (canRoute()) scheduleRecalc();
+      }
+
+      function scheduleRecalc() {
+        clearTimeout(state.recalcTimer);
+        state.recalcTimer = setTimeout(() => {
+          if (!canRoute()) return;
+          if (state.mode === 'ab' && state.waypoints.length === 2) {
+            generateABOptions({ silent: true }).catch(() => {});
+          } else {
+            recalculateEditedRoute().catch(() => {});
+          }
+        }, 450);
+      }
+
+      map.on('click', (e) => addPoint(e.latlng));
+
+      async function apiJson(path, options = {}) {
+        const res = await fetch(API_BASE + path, options);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Service indisponible (${res.status}).`);
+        return data;
+      }
+
+      async function geocode(text) {
+        const q = text.trim();
+        if (!q) throw new Error('Saisissez une adresse ou une ville.');
+        const data = await apiJson('/geocode?q=' + encodeURIComponent(q));
+        if (!data || !Number.isFinite(data.lat) || !Number.isFinite(data.lng)) throw new Error('Adresse introuvable.');
+        return { lat: data.lat, lng: data.lng, label: data.label || q };
+      }
+
+      async function placeFromSearch(input, position) {
+        try {
+          setStatus('Recherche de l’adresse…');
+          const p = await geocode(input.value);
+          if (state.mode === 'ab') {
+            if (position === 'start') {
+              if (state.waypoints.length === 0) state.waypoints.push(p);
+              else state.waypoints[0] = p;
+            } else {
+              if (state.waypoints.length === 0) state.waypoints.push(p);
+              if (state.waypoints.length === 1) state.waypoints.push(p);
+              else state.waypoints[state.waypoints.length - 1] = p;
+            }
+          } else {
+            state.waypoints = [p];
+          }
+          refreshWaypointMarkers();
+          map.setView([p.lat, p.lng], 13);
+          setStatus('Point placé.');
+          if (canRoute()) scheduleRecalc();
+        } catch (err) {
+          setStatus(err.message || 'Erreur de recherche.', 'error');
+        }
+      }
+
+
+      function geolocationErrorMessage(error) {
+        if (!error) return 'Impossible d’obtenir la position de ce PC.';
+        if (error.code === 1) return 'Localisation refusée. Autorisez la localisation pour ce site dans le navigateur.';
+        if (error.code === 2) return 'Position indisponible. Vérifiez les services de localisation de votre PC.';
+        if (error.code === 3) return 'La localisation a pris trop de temps. Réessayez près d’une fenêtre ou avec le Wi‑Fi activé.';
+        return 'Impossible d’obtenir la position de ce PC.';
+      }
+
+      function showCurrentLocation(p, accuracy) {
+        state.currentLocationLayer.clearLayers();
+        const radius = Number.isFinite(accuracy) ? Math.min(Math.max(accuracy, 8), 5000) : 0;
+        if (radius) {
+          L.circle([p.lat, p.lng], {
+            radius,
+            color: '#2866d7',
+            weight: 1,
+            opacity: .35,
+            fillColor: '#2866d7',
+            fillOpacity: .08,
+            interactive: false
+          }).addTo(state.currentLocationLayer);
+        }
+        L.circleMarker([p.lat, p.lng], {
+          radius: 7,
+          color: '#ffffff',
+          weight: 3,
+          fillColor: '#2866d7',
+          fillOpacity: 1
+        }).bindPopup(`Ma position${radius ? `<br>Précision estimée : ±${Math.round(radius)} m` : ''}`).addTo(state.currentLocationLayer);
+      }
+
+      function applyCurrentLocationAsStart(p, accuracy) {
+        state.currentLocation = { ...p, accuracy };
+        showCurrentLocation(p, accuracy);
+        if (state.mode === 'ab') {
+          if (state.waypoints.length === 0) state.waypoints.push({ ...p });
+          else state.waypoints[0] = { ...p };
+          els.startSearch.value = 'Ma position';
+        } else {
+          state.waypoints = [{ ...p }];
+          els.loopSearch.value = 'Ma position';
+        }
+        refreshWaypointMarkers();
+        map.setView([p.lat, p.lng], 15);
+        const accuracyText = Number.isFinite(accuracy) ? ` (précision ±${Math.round(accuracy)} m)` : '';
+        setStatus(`Position utilisée comme départ${accuracyText}.`, 'ok');
+        if (canRoute()) scheduleRecalc();
+      }
+
+      function useCurrentLocation(button) {
+        if (!('geolocation' in navigator)) {
+          setStatus('Ce navigateur ne fournit pas la géolocalisation.', 'error');
+          return;
+        }
+        if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+          setStatus('La géolocalisation nécessite HTTPS ou l’application ouverte sur localhost.', 'error');
+          return;
+        }
+        setBusy(button, true, 'Localisation…');
+        setStatus('Recherche de votre position… Autorisez la localisation si le navigateur le demande.');
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            setBusy(button, false, button === els.useLoopLocationBtn ? '⌖ Démarrer la boucle depuis ma position' : '⌖ Utiliser ma position comme départ');
+            const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            applyCurrentLocationAsStart(p, pos.coords.accuracy);
+          },
+          err => {
+            setBusy(button, false, button === els.useLoopLocationBtn ? '⌖ Démarrer la boucle depuis ma position' : '⌖ Utiliser ma position comme départ');
+            setStatus(geolocationErrorMessage(err), 'error');
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+        );
+      }
+
+      function bicycleCosting() {
+        return {
+          bicycle_type: 'Road',
+          cycling_speed: 25,
+          use_roads: 0.72,
+          use_hills: 0.5,
+          avoid_bad_surfaces: 1,
+          use_tracks: 0,
+          use_ferry: 0,
+          use_living_streets: 0.65,
+          service_penalty: 30,
+          service_factor: 1.4
+        };
+      }
+
+      function requestLocations(waypoints = state.waypoints, loop = state.mode === 'loop') {
+        const points = waypoints.map(p => ({ lat: p.lat, lon: p.lng, type: 'break' }));
+        if (loop && points.length > 1) {
+          const first = points[0];
+          const last = points[points.length - 1];
+          if (haversineM({ lat: first.lat, lng: first.lon }, { lat: last.lat, lng: last.lon }) > 20) {
+            points.push({ lat: first.lat, lon: first.lon, type: 'break' });
+          }
+        }
+        return points;
+      }
+
+      function decodePolyline6(encoded) {
+        let index = 0, lat = 0, lng = 0;
+        const coords = [];
+        while (index < encoded.length) {
+          let result = 0, shift = 0, b;
+          do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20 && index <= encoded.length);
+          const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+          lat += dlat;
+          result = 0; shift = 0;
+          do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20 && index <= encoded.length);
+          const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+          lng += dlng;
+          coords.push([lng / 1e6, lat / 1e6]);
+        }
+        return coords;
+      }
+
+      function encodeSigned(value) {
+        let s = value < 0 ? ~(value << 1) : (value << 1);
+        let out = '';
+        while (s >= 0x20) {
+          out += String.fromCharCode((0x20 | (s & 0x1f)) + 63);
+          s >>= 5;
+        }
+        return out + String.fromCharCode(s + 63);
+      }
+
+      function encodePolyline6(coords) {
+        let lastLat = 0, lastLng = 0, out = '';
+        coords.forEach(c => {
+          const lng = Math.round(c[0] * 1e6);
+          const lat = Math.round(c[1] * 1e6);
+          out += encodeSigned(lat - lastLat);
+          out += encodeSigned(lng - lastLng);
+          lastLat = lat; lastLng = lng;
+        });
+        return out;
+      }
+
+      function normalizeTrip(trip, raw) {
+        if (!trip || !trip.summary || !Array.isArray(trip.legs) || !trip.legs.length) throw new Error('Le moteur n’a renvoyé aucun itinéraire.');
+        const coords = [];
+        trip.legs.forEach(leg => {
+          const legCoords = typeof leg.shape === 'string' ? decodePolyline6(leg.shape) : [];
+          legCoords.forEach((c, i) => {
+            if (coords.length && i === 0) {
+              const prev = coords[coords.length - 1];
+              if (Math.abs(prev[0] - c[0]) < 1e-7 && Math.abs(prev[1] - c[1]) < 1e-7) return;
+            }
+            coords.push(c);
+          });
+        });
+        if (coords.length < 2) throw new Error('La géométrie du trajet est vide.');
+        return {
+          distance: Number(trip.summary.length) * 1000,
+          time: Number(trip.summary.time) * 1000,
+          coords,
+          encoded: encodePolyline6(coords),
+          raw
+        };
+      }
+
+      function normalizeRoute(data) {
+        return normalizeTrip(data && data.trip, data);
+      }
+
+      function normalizeRouteSet(data) {
+        const routes = [];
+        if (data && data.trip) {
+          try { routes.push(normalizeTrip(data.trip, data)); } catch (_) {}
+        }
+        for (const alt of (data && Array.isArray(data.alternates) ? data.alternates : [])) {
+          const trip = alt && alt.trip ? alt.trip : alt;
+          try { routes.push(normalizeTrip(trip, alt)); } catch (_) {}
+        }
+        return routes;
+      }
+
+      function cloneWaypoints(points) {
+        return points.map(p => ({ lat: p.lat, lng: p.lng, ...(p.label ? { label: p.label } : {}) }));
+      }
+
+      function distinctRoutes(routes) {
+        const seen = new Set();
+        const out = [];
+        for (const route of routes) {
+          if (!route || !route.encoded) continue;
+          const signature = route.encoded;
+          if (seen.has(signature)) continue;
+          seen.add(signature);
+          out.push(route);
+        }
+        return out;
+      }
+
+      async function fetchRouteData(serial, options = {}) {
+        const waypoints = options.waypoints || state.waypoints;
+        const loop = options.loop ?? (state.mode === 'loop');
+        const costing = { ...bicycleCosting(), ...(options.costingOverrides || {}) };
+        const payload = {
+          locations: requestLocations(waypoints, loop),
+          costing: 'bicycle',
+          costing_options: { bicycle: costing },
+          directions_type: 'none',
+          directions_options: { units: 'kilometers', language: 'fr-FR' },
+          shape_format: 'polyline6'
+        };
+        if (Number.isInteger(options.alternates) && options.alternates > 0) payload.alternates = options.alternates;
+        const data = await apiJson('/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (serial !== state.requestSerial) throw new Error('Requête remplacée par une plus récente.');
+        return data;
+      }
+
+      async function fetchSingleRoute(serial, options = {}) {
+        return normalizeRoute(await fetchRouteData(serial, options));
+      }
+
+      async function fetchRouteAlternatives(serial, options = {}) {
+        return normalizeRouteSet(await fetchRouteData(serial, { ...options, alternates: options.alternates ?? 2 }));
+      }
+
+      function renderRoute(route) {
+        state.routeCoords = route.coords;
+        state.routeEncoded = route.encoded;
+        state.routeSafe = false;
+        els.gpxBtn.disabled = true;
+        if (state.routeLayer) map.removeLayer(state.routeLayer);
+        const latlngs = route.coords.map(c => [c[1], c[0]]);
+        const routeOutline = L.polyline(latlngs, {
+          color: '#ffffff',
+          weight: 10,
+          opacity: .96,
+          lineJoin: 'round',
+          lineCap: 'round',
+          interactive: false
+        });
+        const routeMain = L.polyline(latlngs, {
+          color: '#126b58',
+          weight: 6,
+          opacity: 1,
+          lineJoin: 'round',
+          lineCap: 'round',
+          interactive: false
+        });
+        state.routeLayer = L.featureGroup([routeOutline, routeMain]).addTo(map);
+        routeMain.bringToFront();
+        map.fitBounds(state.routeLayer.getBounds(), { padding: [42, 42], maxZoom: 16 });
+        els.distanceStat.textContent = fmtKm(route.distance);
+        els.timeStat.textContent = fmtTime(route.time);
+        els.ascendStat.textContent = '…';
+        els.descendStat.textContent = '…';
+      }
+
+      async function requestRouteAudit(route, shapeMatch) {
+        return apiJson('/trace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            encoded_polyline: route.encoded,
+            shape_match: shapeMatch,
+            costing: 'bicycle',
+            costing_options: { bicycle: bicycleCosting() },
+            filters: {
+              action: 'include',
+              attributes: ['edge.use', 'edge.surface', 'edge.unpaved', 'edge.length', 'edge.way_id']
+            }
+          })
+        });
+      }
+
+      async function auditRoute(route, serial) {
+        let data;
+        let usedFallback = false;
+        try {
+          data = await requestRouteAudit(route, 'edge_walk');
+        } catch (edgeWalkError) {
+          if (serial !== state.requestSerial) return;
+          usedFallback = true;
+          setStatus('Vérification du revêtement : seconde tentative…');
+          data = await requestRouteAudit(route, 'walk_or_snap');
+        }
+        if (serial !== state.requestSerial) return;
+        const edges = Array.isArray(data.edges) ? data.edges : [];
+        if (!edges.length) {
+          throw new Error('Le contrôle du revêtement n’a retourné aucun segment.');
+        }
+        const problems = [];
+        let unknown = 0;
+        for (const edge of edges) {
+          const use = String(edge.use || '').toLowerCase().replace(/-/g, '_');
+          const surface = String(edge.surface || '').toLowerCase().replace(/-/g, '_');
+          if (!use || !surface) unknown++;
+          if (edge.unpaved === true) problems.push('segment non revêtu');
+          if (use && !ALLOWED_USES.has(use)) problems.push(`voie ${use}`);
+          if (surface && !ALLOWED_SURFACES.has(surface)) problems.push(`surface ${surface}`);
+        }
+        const unique = [...new Set(problems)];
+        if (unique.length) {
+          state.routeSafe = false;
+          els.gpxBtn.disabled = true;
+          setStatus(`Trajet refusé : ${unique.slice(0, 5).join(', ')}. Déplacez un point de passage pour forcer une route/piste cyclable goudronnée.`, 'error');
+        } else if (unknown) {
+          state.routeSafe = false;
+          els.gpxBtn.disabled = true;
+          setStatus('Trajet non validé : certains segments n’ont pas assez d’informations de surface. Export GPX bloqué par précaution.', 'warn');
+        } else {
+          state.routeSafe = true;
+          els.gpxBtn.disabled = false;
+          setStatus(usedFallback
+            ? 'Contrôle strict OK après seconde vérification : parcours compatible vélo de route.'
+            : 'Contrôle strict OK : uniquement route/piste cyclable avec surface pavée compatible vélo de route.', 'ok');
+        }
+      }
+
+      function sampleForElevation(coords) {
+        if (coords.length <= 450) return coords;
+        const step = (coords.length - 1) / 449;
+        const out = [];
+        for (let i = 0; i < 450; i++) out.push(coords[Math.min(coords.length - 1, Math.round(i * step))]);
+        return out;
+      }
+
+      function smoothHeights(values) {
+        return values.map((_, i) => {
+          const start = Math.max(0, i - 1), end = Math.min(values.length - 1, i + 1);
+          let sum = 0, n = 0;
+          for (let j = start; j <= end; j++) if (Number.isFinite(values[j])) { sum += values[j]; n++; }
+          return n ? sum / n : NaN;
+        });
+      }
+
+      async function loadElevation(route, serial) {
+        try {
+          const sampled = sampleForElevation(route.coords);
+          const data = await apiJson('/height', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shape: sampled.map(c => ({ lon: c[0], lat: c[1] })), height_precision: 1 })
+          });
+          if (serial !== state.requestSerial) return;
+          const heights = smoothHeights((data.height || []).map(Number));
+          if (heights.length < 2) throw new Error('profil absent');
+          let up = 0, down = 0;
+          for (let i = 1; i < heights.length; i++) {
+            if (!Number.isFinite(heights[i]) || !Number.isFinite(heights[i - 1])) continue;
+            const d = heights[i] - heights[i - 1];
+            if (d > 1.5) up += d;
+            else if (d < -1.5) down -= d;
+          }
+          els.ascendStat.textContent = Math.round(up) + ' m';
+          els.descendStat.textContent = Math.round(down) + ' m';
+        } catch (_) {
+          if (serial === state.requestSerial) {
+            els.ascendStat.textContent = '—';
+            els.descendStat.textContent = '—';
+          }
+        }
+      }
+
+      function routeChoiceLabel(index, count) {
+        if (count >= 3) return ['Court', 'Moyen', 'Long'][Math.min(index, 2)];
+        if (count === 2) return index === 0 ? 'Court' : 'Long';
+        return 'Itinéraire';
+      }
+
+      function renderRouteChoices() {
+        els.routeChoices.innerHTML = '';
+        if (!state.routeOptions.length) {
+          els.routeChoices.classList.add('hidden');
+          return;
+        }
+        state.routeOptions.forEach((route, index) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'route-choice' + (index === state.selectedRouteOption ? ' active' : '');
+          button.setAttribute('aria-pressed', String(index === state.selectedRouteOption));
+          const label = route.label || routeChoiceLabel(index, state.routeOptions.length);
+          button.innerHTML = `<span class="route-choice-title">${label}</span><span class="route-choice-meta">${fmtKm(route.distance)} · ${fmtTime(route.time)}</span>`;
+          button.addEventListener('click', () => activateRouteOption(index));
+          els.routeChoices.appendChild(button);
+        });
+        els.routeChoices.classList.remove('hidden');
+      }
+
+      function chooseThreeByDistance(routes) {
+        const sorted = distinctRoutes(routes).sort((a, b) => a.distance - b.distance);
+        if (sorted.length <= 3) return sorted;
+        const middle = Math.floor((sorted.length - 1) / 2);
+        return [sorted[0], sorted[middle], sorted[sorted.length - 1]];
+      }
+
+      async function activateRouteOption(index) {
+        const route = state.routeOptions[index];
+        if (!route) return;
+        state.selectedRouteOption = index;
+        renderRouteChoices();
+        if (Array.isArray(route.waypoints) && route.waypoints.length) {
+          state.waypoints = cloneWaypoints(route.waypoints);
+          refreshWaypointMarkers();
+        }
+        const serial = ++state.requestSerial;
+        renderRoute(route);
+        setStatus(`${route.label || 'Itinéraire'} sélectionné. Vérification du revêtement…`);
+        loadPoisNearRoute(serial).catch(() => {});
+        auditRoute(route, serial).catch((err) => {
+          if (serial === state.requestSerial) {
+            state.routeSafe = false;
+            els.gpxBtn.disabled = true;
+            setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Export GPX bloqué par précaution.`, 'error');
+          }
+        });
+        loadElevation(route, serial).catch(() => {});
+      }
+
+      function setRouteOptions(routes) {
+        const chosen = chooseThreeByDistance(routes);
+        chosen.forEach((route, index) => { route.label = routeChoiceLabel(index, chosen.length); });
+        state.routeOptions = chosen;
+        state.selectedRouteOption = chosen.length >= 3 ? 1 : 0;
+        renderRouteChoices();
+        if (chosen.length) activateRouteOption(state.selectedRouteOption);
+      }
+
+      async function recalculateEditedRoute() {
+        if (!canRoute()) return false;
+        const serial = ++state.requestSerial;
+        clearRouteChoices();
+        setStatus('Recalcul du tracé modifié…');
+        try {
+          const currentWaypoints = cloneWaypoints(state.waypoints);
+          const route = await fetchSingleRoute(serial, { waypoints: currentWaypoints, loop: state.mode === 'loop' });
+          route.waypoints = currentWaypoints;
+          if (serial !== state.requestSerial) return false;
+          renderRoute(route);
+          setStatus('Tracé modifié. Vérification stricte du revêtement…');
+          loadPoisNearRoute(serial).catch(() => {});
+          auditRoute(route, serial).catch((err) => {
+            if (serial === state.requestSerial) {
+              state.routeSafe = false;
+              els.gpxBtn.disabled = true;
+              setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Export GPX bloqué par précaution.`, 'error');
+            }
+          });
+          loadElevation(route, serial).catch(() => {});
+          return true;
+        } catch (err) {
+          if (String(err.message).includes('remplacée')) return false;
+          if (serial === state.requestSerial) {
+            if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
+            resetStats();
+            setStatus(err.message || 'Impossible de recalculer cet itinéraire.', 'error');
+          }
+          return false;
+        }
+      }
+
+      function buildABDetourWaypoints(start, end, offsetFactor, side = 1) {
+        const directKm = Math.max(0.5, haversineM(start, end) / 1000);
+        const bearing = initialBearing(start, end);
+        const midpoint = destinationPoint(start, directKm / 2, bearing);
+        const offsetKm = Math.min(35, Math.max(0.7, directKm * offsetFactor));
+        const via = destinationPoint(midpoint, offsetKm, bearing + 90 * side);
+        return [
+          { lat: start.lat, lng: start.lng },
+          via,
+          { lat: end.lat, lng: end.lng }
+        ];
+      }
+
+      async function generateABOptions({ silent = false } = {}) {
+        if (state.mode !== 'ab') return false;
+        if (state.waypoints.length < 2) {
+          setStatus('Placez un départ et une arrivée.', 'warn');
+          return false;
+        }
+        const baseWaypoints = cloneWaypoints(state.waypoints);
+        const serial = ++state.requestSerial;
+        if (!silent) setBusy(els.calculateBtn, true, 'Recherche…');
+        setStatus('Recherche de 3 itinéraires vélo de route…');
+        try {
+          let routes = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 });
+          routes.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
+          routes = distinctRoutes(routes);
+
+          // Certains serveurs ou certaines zones renvoient moins de 3 alternatives.
+          // Dans ce cas, on construit des détours routables progressifs puis on trie par distance réelle.
+          if (routes.length < 3 && baseWaypoints.length === 2) {
+            const patterns = [
+              [0.10, 1], [0.10, -1], [0.18, 1], [0.18, -1], [0.28, 1], [0.28, -1]
+            ];
+            for (const [factor, side] of patterns) {
+              if (routes.length >= 3) break;
+              const detourWaypoints = buildABDetourWaypoints(baseWaypoints[0], baseWaypoints[1], factor, side);
+              try {
+                const route = await fetchSingleRoute(serial, { waypoints: detourWaypoints, loop: false });
+                route.waypoints = cloneWaypoints(detourWaypoints);
+                routes = distinctRoutes([...routes, route]);
+              } catch (_) {}
+            }
+          }
+
+          const chosen = chooseThreeByDistance(routes);
+          if (!chosen.length) throw new Error('Aucun itinéraire routable trouvé.');
+          setRouteOptions(chosen);
+          if (chosen.length < 3) {
+            setStatus(`${chosen.length} proposition${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Le réseau local n’a pas fourni 3 tracés distincts.`, 'warn');
+          }
+          return true;
+        } catch (err) {
+          if (String(err.message).includes('remplacée')) return false;
+          if (serial === state.requestSerial) {
+            if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
+            resetStats();
+            clearRouteChoices();
+            setStatus(err.message || 'Impossible de calculer les itinéraires.', 'error');
+          }
+          return false;
+        } finally {
+          if (!silent) setBusy(els.calculateBtn, false, 'Calculer 3 itinéraires');
+        }
+      }
+
+      function destinationPoint(origin, distanceKm, bearingDeg) {
+        const R = 6371;
+        const d = distanceKm / R;
+        const brng = bearingDeg * Math.PI / 180;
+        const lat1 = origin.lat * Math.PI / 180;
+        const lon1 = origin.lng * Math.PI / 180;
+        const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng));
+        const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+        return { lat: lat2 * 180 / Math.PI, lng: ((lon2 * 180 / Math.PI + 540) % 360) - 180 };
+      }
+
+      function initialBearing(a, b) {
+        const lat1 = a.lat * Math.PI / 180, lat2 = b.lat * Math.PI / 180;
+        const dLon = (b.lng - a.lng) * Math.PI / 180;
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+      }
+
+      function buildLoopWaypoints(start, targetKm, seed) {
+        const orientation = (25 + seed * 67) % 360;
+        const radiusKm = targetKm / (4 * Math.SQRT2 * 1.12);
+        const center = destinationPoint(start, radiusKm, orientation);
+        const startAngle = initialBearing(center, start);
+        return [
+          { lat: start.lat, lng: start.lng },
+          destinationPoint(center, radiusKm, startAngle + 90),
+          destinationPoint(center, radiusKm, startAngle + 180),
+          destinationPoint(center, radiusKm, startAngle + 270)
+        ];
+      }
+
+      async function resolveLoopStart() {
+        const query = els.loopSearch.value.trim();
+        if (query && query !== 'Ma position') {
+          setStatus('Recherche du départ de la boucle…');
+          const p = await geocode(query);
+          state.waypoints = [p];
+          refreshWaypointMarkers();
+          map.setView([p.lat, p.lng], 13);
+          return p;
+        }
+        if (state.waypoints.length) return { ...state.waypoints[0] };
+        throw new Error('Indiquez un départ, utilisez votre position ou cliquez une fois sur la carte.');
+      }
+
+      async function generateLoop() {
+        setBusy(els.generateLoopBtn, true, 'Création des 3 boucles…');
+        const serial = ++state.requestSerial;
+        try {
+          clearRouteChoices();
+          const start = await resolveLoopStart();
+          if (serial !== state.requestSerial) return false;
+
+          const targetKm = Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
+          els.loopDistance.value = targetKm;
+          const targets = [
+            Math.max(10, targetKm * 0.80),
+            targetKm,
+            Math.min(350, targetKm * 1.20)
+          ];
+          const routes = [];
+
+          for (let variant = 0; variant < targets.length; variant++) {
+            let found = null;
+            for (let attempt = 0; attempt < 3 && !found; attempt++) {
+              const seed = state.loopSeed + variant * 5 + attempt;
+              const loopWaypoints = buildLoopWaypoints(start, targets[variant], seed);
+              setStatus(`Création des boucles… ${variant + 1}/3${attempt ? ` · tentative ${attempt + 1}` : ''}`);
+              try {
+                const route = await fetchSingleRoute(serial, { waypoints: loopWaypoints, loop: true });
+                route.waypoints = cloneWaypoints(loopWaypoints);
+                found = route;
+              } catch (_) {}
+            }
+            if (found) routes.push(found);
+          }
+
+          state.loopSeed += 17;
+          const chosen = chooseThreeByDistance(routes);
+          if (!chosen.length) throw new Error('Impossible de créer une boucle routable depuis ce départ. Essayez une autre distance ou une autre position.');
+          setRouteOptions(chosen);
+          if (chosen.length < 3) {
+            setStatus(`${chosen.length} boucle${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Le réseau local n’a pas permis 3 boucles distinctes.`, 'warn');
+          }
+          return true;
+        } catch (err) {
+          if (String(err.message).includes('remplacée')) return false;
+          if (serial === state.requestSerial) {
+            if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
+            resetStats();
+            clearRouteChoices();
+            setStatus(err.message || 'Impossible de créer les boucles.', 'error');
+          }
+          return false;
+        } finally {
+          setBusy(els.generateLoopBtn, false, 'Proposer 3 boucles');
+        }
+      }
+
+      function pointToSegmentDistanceM(coord, a, b) {
+        const lat0 = ((coord[1] + a[1] + b[1]) / 3) * Math.PI / 180;
+        const kx = 111320 * Math.max(0.15, Math.cos(lat0));
+        const ky = 110540;
+        const px = coord[0] * kx, py = coord[1] * ky;
+        const ax = a[0] * kx, ay = a[1] * ky;
+        const bx = b[0] * kx, by = b[1] * ky;
+        const dx = bx - ax, dy = by - ay;
+        const len2 = dx * dx + dy * dy;
+        if (!len2) return Math.hypot(px - ax, py - ay);
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+        return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+      }
+
+      function simplifyRouteDouglasPeucker(coords, epsilonM) {
+        if (coords.length <= 2) return coords.slice();
+        const keep = new Uint8Array(coords.length);
+        keep[0] = 1;
+        keep[coords.length - 1] = 1;
+        const stack = [[0, coords.length - 1]];
+        while (stack.length) {
+          const [first, last] = stack.pop();
+          let best = 0;
+          let bestIndex = -1;
+          for (let i = first + 1; i < last; i++) {
+            const d = pointToSegmentDistanceM(coords[i], coords[first], coords[last]);
+            if (d > best) { best = d; bestIndex = i; }
+          }
+          if (bestIndex > 0 && best > epsilonM) {
+            keep[bestIndex] = 1;
+            stack.push([first, bestIndex], [bestIndex, last]);
+          }
+        }
+        const out = [];
+        for (let i = 0; i < coords.length; i++) if (keep[i]) out.push(coords[i]);
+        return out;
+      }
+
+      function sampleRouteForPoiQuery(coords) {
+        if (!coords.length) return { route: [], radius: MAX_POI_DISTANCE_M };
+        let epsilon = 90;
+        let simplified = simplifyRouteDouglasPeucker(coords, epsilon);
+        while (simplified.length > 120 && epsilon < 220) {
+          epsilon += 25;
+          simplified = simplifyRouteDouglasPeucker(coords, epsilon);
+        }
+        // La requête distante utilise un rayon légèrement supérieur pour compenser
+        // la simplification. Le filtrage final reste strictement à 400 m.
+        const queryRadius = Math.min(680, Math.round(MAX_POI_DISTANCE_M + epsilon + 30));
+        return {
+          route: simplified.map(c => [Number(c[1].toFixed(5)), Number(c[0].toFixed(5))]),
+          radius: queryRadius
+        };
+      }
+
+      function parseWaterPois(data) {
+        const water = [];
+        if (Array.isArray(data.waters)) {
+          for (const item of data.waters) {
+            const lat = Number(item.lat);
+            const lng = Number(item.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+            const p = { lat, lng };
+            if (distanceToRouteM(p) > MAX_POI_DISTANCE_M) continue;
+            water.push({
+              lat,
+              lng,
+              name: item.name || 'Eau potable',
+              operator: item.operator || '',
+              description: item.description || '',
+              source: item.source || data.source || 'Huwise / OpenDataSoft',
+              osmUrl: item.osm_url || '',
+              tags: {}
+            });
+          }
+        } else {
+          for (const el of data.elements || []) {
+            const lat = Number(el.lat ?? (el.center && el.center.lat));
+            const lng = Number(el.lon ?? (el.center && el.center.lon));
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+            const tags = el.tags || {};
+            const p = { lat, lng };
+            if (distanceToRouteM(p) > MAX_POI_DISTANCE_M) continue;
+            const waterTagged = tags.amenity === 'drinking_water' || tags.drinking_water === 'yes';
+            if (waterTagged && tags.access !== 'private' && tags.fee !== 'yes') {
+              water.push({ lat, lng, name: tags.name || 'Eau potable', tags, source: 'OpenStreetMap / Overpass' });
+            }
+          }
+        }
+        state.pois.water = dedupePois(water);
+      }
+
+      function parseBakeryPois(data) {
+        const bakery = [];
+        for (const item of data.bakeries || []) {
+          const lat = Number(item.lat);
+          const lng = Number(item.lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+          const p = { lat, lng };
+          if (distanceToRouteM(p) > MAX_POI_DISTANCE_M) continue;
+          bakery.push({
+            lat,
+            lng,
+            name: item.name || 'Boulangerie',
+            address: item.address || '',
+            siret: item.siret || '',
+            naf: item.naf || '',
+            source: item.source || 'Annuaire des Entreprises / SIRENE',
+            tags: {}
+          });
+        }
+        state.pois.bakery = dedupePois(bakery);
+      }
+
+      function parseCemeteryPois(data) {
+        const cemetery = [];
+        for (const el of data.elements || []) {
+          const lat = Number(el.lat ?? (el.center && el.center.lat));
+          const lng = Number(el.lon ?? (el.center && el.center.lon));
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+          const tags = el.tags || {};
+          const p = { lat, lng };
+          if (distanceToRouteM(p) > MAX_POI_DISTANCE_M) continue;
+          const cemeteryTagged = tags.landuse === 'cemetery' || tags.amenity === 'grave_yard';
+          if (cemeteryTagged && tags.access !== 'private') {
+            cemetery.push({ lat, lng, name: tags.name || 'Cimetière', tags, potentialWater: true });
+          }
+        }
+        state.pois.cemetery = dedupePois(cemetery);
+      }
+
+      async function loadPoisNearRoute(serial) {
+        if (!state.routeCoords.length) return;
+        state.poiLayers.water.clearLayers();
+        state.poiLayers.cemetery.clearLayers();
+        state.poiLayers.bakery.clearLayers();
+        state.pois.water = [];
+        state.pois.cemetery = [];
+        state.pois.bakery = [];
+        state.poiLoadingWater = true;
+        state.poiLoadingBakery = true;
+        state.poiLoadingCemetery = true;
+        state.poiWaterError = false;
+        state.poiBakeryError = false;
+        state.poiCemeteryError = false;
+        updatePoiCounts();
+
+        const sampled = sampleRouteForPoiQuery(state.routeCoords);
+        const requestBody = { route: sampled.route, radius: sampled.radius };
+
+        const waterTask = apiJson('/pois', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, kind: 'water' })
+        }).then(data => {
+          if (serial !== state.requestSerial) return;
+          parseWaterPois(data);
+          state.poiWaterError = false;
+          renderPois();
+        }).catch(err => {
+          if (serial !== state.requestSerial) return;
+          state.poiWaterError = true;
+          console.warn('POI eau:', err);
+        }).finally(() => {
+          if (serial === state.requestSerial) {
+            state.poiLoadingWater = false;
+            updatePoiCounts();
+          }
+        });
+
+        const bakeryTask = apiJson('/pois', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, kind: 'bakery' })
+        }).then(data => {
+          if (serial !== state.requestSerial) return;
+          parseBakeryPois(data);
+          state.poiBakeryError = false;
+          renderPois();
+        }).catch(err => {
+          if (serial !== state.requestSerial) return;
+          state.poiBakeryError = true;
+          console.warn('Boulangeries Annuaire des Entreprises:', err);
+        }).finally(() => {
+          if (serial === state.requestSerial) {
+            state.poiLoadingBakery = false;
+            updatePoiCounts();
+          }
+        });
+
+        const cemeteryTask = apiJson('/pois', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, kind: 'cemetery' })
+        }).then(data => {
+          if (serial !== state.requestSerial) return;
+          parseCemeteryPois(data);
+          state.poiCemeteryError = false;
+          renderPois();
+        }).catch(err => {
+          if (serial !== state.requestSerial) return;
+          state.poiCemeteryError = true;
+          console.warn('POI cimetières:', err);
+        }).finally(() => {
+          if (serial === state.requestSerial) {
+            state.poiLoadingCemetery = false;
+            updatePoiCounts();
+          }
+        });
+
+        await Promise.allSettled([waterTask, bakeryTask, cemeteryTask]);
+      }
+
+      function dedupePois(items) {
+        const seen = new Set();
+        return items.filter(p => {
+          const key = p.siret || `${p.lat.toFixed(5)},${p.lng.toFixed(5)},${p.name}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      function poiIcon(type) {
+        const symbol = type === 'water' ? '💧' : (type === 'cemetery' ? '💧' : '🥐');
+        const label = type === 'water' ? 'Eau potable' : (type === 'cemetery' ? 'Eau potentielle (cimetière)' : 'Boulangerie');
+        return L.divIcon({
+          className: 'poi-leaflet-icon',
+          html: `<div class="poi-map-icon ${type}" role="img" aria-label="${label}">${symbol}</div>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+          popupAnchor: [0, -17]
+        });
+      }
+
+      function renderPois() {
+        state.poiLayers.water.clearLayers();
+        state.poiLayers.cemetery.clearLayers();
+        state.poiLayers.bakery.clearLayers();
+        if (els.waterToggle.checked) {
+          state.pois.water.forEach(p => {
+            const operator = p.operator ? `<br><small>${escapeHtml(p.operator)}</small>` : '';
+            const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
+            L.marker([p.lat, p.lng], { icon: poiIcon('water'), keyboard: true })
+              .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>Eau potable${operator}${source}`)
+              .addTo(state.poiLayers.water);
+          });
+          state.pois.cemetery.forEach(p => {
+            L.marker([p.lat, p.lng], { icon: poiIcon('cemetery'), keyboard: true })
+              .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>Cimetière : point d’eau potentiel.<br><small>La présence et la potabilité de l’eau ne sont pas garanties.</small>`)
+              .addTo(state.poiLayers.cemetery);
+          });
+        }
+        if (els.bakeryToggle.checked) {
+          state.pois.bakery.forEach(p => {
+            const address = p.address ? `<br><small>${escapeHtml(p.address)}</small>` : '';
+            const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
+            L.marker([p.lat, p.lng], { icon: poiIcon('bakery'), keyboard: true })
+              .bindPopup(`<strong>${escapeHtml(p.name)}</strong>${address}${source}`)
+              .addTo(state.poiLayers.bakery);
+          });
+        }
+        updatePoiCounts();
+      }
+
+      function updatePoiCounts() {
+        const wc = state.pois.water.length;
+        const cc = state.pois.cemetery.length;
+        const bc = state.pois.bakery.length;
+
+        if (state.poiBakeryError) {
+          els.bakeryCount.textContent = 'Boulangeries indisponibles';
+        } else if (state.poiLoadingBakery) {
+          els.bakeryCount.textContent = 'Recherche boulangeries…';
+        } else {
+          els.bakeryCount.textContent = `${bc} boulangerie${bc > 1 ? 's' : ''}`;
+        }
+
+        if (state.poiWaterError && state.poiCemeteryError) {
+          els.waterCount.textContent = 'Points d’eau indisponibles';
+        } else if (state.poiLoadingWater) {
+          els.waterCount.textContent = 'Recherche eau…';
+        } else if (state.poiLoadingCemetery) {
+          els.waterCount.textContent = `${wc} eau · cimetières…`;
+        } else if (state.poiCemeteryError) {
+          els.waterCount.textContent = `${wc} eau · cimetières indisponibles`;
+        } else {
+          els.waterCount.textContent = `${wc} eau · ${cc} cimetière${cc > 1 ? 's' : ''}`;
+        }
+      }
+
+      function distanceToRouteM(p) {
+        if (!state.routeCoords.length) return Infinity;
+        let min = Infinity;
+        const step = Math.max(1, Math.floor(state.routeCoords.length / 1800));
+        for (let i = 0; i < state.routeCoords.length; i += step) {
+          const c = state.routeCoords[i];
+          const d = haversineM(p, { lat: c[1], lng: c[0] });
+          if (d < min) min = d;
+          if (min < 35) return min;
+        }
+        return min;
+      }
+
+      function haversineM(a, b) {
+        const R = 6371000;
+        const dLat = (b.lat - a.lat) * Math.PI / 180;
+        const dLon = (b.lng - a.lng) * Math.PI / 180;
+        const lat1 = a.lat * Math.PI / 180;
+        const lat2 = b.lat * Math.PI / 180;
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[ch]));
+      }
+
+      function escapeXml(s) {
+        return String(s).replace(/[<>&'\"]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[ch]));
+      }
+
+      function downloadGpx() {
+        if (!state.routeCoords.length || !state.routeSafe) return;
+        const track = state.routeCoords.map(c => `    <trkpt lat="${c[1]}" lon="${c[0]}"></trkpt>`).join('\n');
+        const poiWpts = [];
+        if (els.waterToggle.checked) {
+          state.pois.water.forEach(p => poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)}</name><type>Eau potable</type></wpt>`));
+          state.pois.cemetery.forEach(p => poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)} — eau potentielle</name><desc>Cimetière : présence et potabilité de l’eau à vérifier sur place.</desc><type>Eau potentielle - cimetière</type></wpt>`));
+        }
+        if (els.bakeryToggle.checked) state.pois.bakery.forEach(p => poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)}</name><type>Boulangerie</type></wpt>`));
+        const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="RouteVelo" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>Itinéraire vélo de route</name></metadata>\n${poiWpts.join('\n')}\n  <trk><name>RouteVelo</name><type>Cyclisme route</type><trkseg>\n${track}\n  </trkseg></trk>\n</gpx>`;
+        const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `route-velo-${new Date().toISOString().slice(0, 10)}.gpx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      function openMobilePanel() {
+        document.body.classList.add('mobile-panel-open');
+        setTimeout(() => map.invalidateSize(), 240);
+      }
+
+      function closeMobilePanel() {
+        document.body.classList.remove('mobile-panel-open');
+        setTimeout(() => map.invalidateSize(), 240);
+      }
+
+      els.mobileMenuBtn.addEventListener('click', openMobilePanel);
+      els.mobileCloseBtn.addEventListener('click', closeMobilePanel);
+      els.mobileOverlay.addEventListener('click', closeMobilePanel);
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeMobilePanel();
+      });
+      window.addEventListener('resize', () => {
+        if (window.innerWidth > 850) document.body.classList.remove('mobile-panel-open');
+        map.invalidateSize();
+      });
+
+      els.modeAB.addEventListener('click', () => switchMode('ab'));
+      els.modeLoop.addEventListener('click', () => switchMode('loop'));
+      els.startSearchBtn.addEventListener('click', () => placeFromSearch(els.startSearch, 'start'));
+      els.endSearchBtn.addEventListener('click', () => placeFromSearch(els.endSearch, 'end'));
+      els.loopSearchBtn.addEventListener('click', () => placeFromSearch(els.loopSearch, 'start'));
+      els.useLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLocationBtn));
+      els.useLoopLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLoopLocationBtn));
+      els.calculateBtn.addEventListener('click', () => { closeMobilePanel(); generateABOptions(); });
+      els.generateLoopBtn.addEventListener('click', () => { closeMobilePanel(); generateLoop(); });
+      els.filterToggleBtn.addEventListener('click', () => {
+        const collapsed = els.filterPanel.classList.toggle('collapsed');
+        els.filterToggleBtn.setAttribute('aria-expanded', String(!collapsed));
+        els.filterChevron.textContent = collapsed ? '+' : '−';
+      });
+      els.waterToggle.addEventListener('change', renderPois);
+      els.bakeryToggle.addEventListener('change', renderPois);
+      els.gpxBtn.addEventListener('click', downloadGpx);
+      els.undoBtn.addEventListener('click', () => {
+        if (!state.waypoints.length) return;
+        state.waypoints.pop();
+        refreshWaypointMarkers();
+        clearRouteOnly();
+        if (canRoute()) scheduleRecalc();
+      });
+      els.clearBtn.addEventListener('click', clearAll);
+      [els.startSearch, els.endSearch, els.loopSearch].forEach(input => {
+        input.addEventListener('keydown', e => {
+          if (e.key !== 'Enter') return;
+          if (input === els.startSearch) placeFromSearch(input, 'start');
+          if (input === els.endSearch) placeFromSearch(input, 'end');
+          if (input === els.loopSearch) placeFromSearch(input, 'start');
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

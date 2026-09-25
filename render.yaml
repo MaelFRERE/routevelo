@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: routevelo
+    runtime: python
+    plan: free
+    buildCommand: python -m compileall .
+    startCommand: python server.py
+    healthCheckPath: /health
+    envVars:
+      - key: APP_PASSWORD
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
