@@ -1,4 +1,4 @@
-# RouteVelo V33
+# RouteVelo V34
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -206,3 +206,13 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Fermeture par X, fond assombri ou touche Échap.
 - Bouton de génération optimisé pour le tactile et conservé visible pendant le défilement.
 - Réglages, aliments personnalisés, sauvegarde locale et génération du plan sont conservés.
+
+
+## V34 — carte compacte, mini-carte altitude et interface PC rétractable
+
+- La carte principale est plus courte : les 3 propositions puis Distance / Temps / D+ / D− sont maintenant placées juste sous la carte, sans la recouvrir.
+- Le profil d’élévation est affiché à côté d’une mini-carte du tracé sur ordinateur ; le point rouge se déplace simultanément sur la carte principale et la mini-carte.
+- Sur mobile, le profil et la mini-carte s’empilent pour garder de gros éléments tactiles et une lecture confortable.
+- Le bouton **Plan nutritionnel** est placé directement sous le profil d’élévation.
+- Après **Créer mon plan nutrition**, les réglages et la liste des aliments disparaissent : la fenêtre affiche uniquement le plan, avec un bouton **Modifier mes aliments** pour revenir aux réglages.
+- Sur ordinateur, un bouton en haut de la carte permet de rétracter ou réafficher le menu de gauche ; le choix est mémorisé dans le navigateur.

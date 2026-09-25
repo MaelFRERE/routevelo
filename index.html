@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- RouteVelo V33 -->
+<!-- RouteVelo V34 -->
 <html lang="fr">
 <head>
   <!-- RouteVelo V26 -->
@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="33" />
+  <meta name="routevelo-version" content="34" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -889,10 +889,163 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
+  
+
+    /* V34 — carte plus courte, résumé sous la carte, mini-carte altitude et menu PC rétractable. */
+    .app {
+      grid-template-rows: auto auto auto;
+      transition: grid-template-columns .22s ease;
+    }
+    .sidebar {
+      grid-row: 1 / span 3;
+      min-width: 0;
+      transition: transform .22s ease, opacity .16s ease;
+    }
+    .app.sidebar-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+    .app.sidebar-collapsed .sidebar { transform: translateX(-102%); opacity: 0; pointer-events: none; }
+
+    .map-wrap {
+      grid-row: 1;
+      height: clamp(500px, 68vh, 720px);
+      min-height: 0;
+      border-bottom: 1px solid var(--line);
+    }
+    #map { height: 100%; min-height: 0; }
+
+    .desktop-sidebar-toggle {
+      position: absolute;
+      z-index: 920;
+      top: 12px;
+      left: 58px;
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(255,255,255,.97);
+      color: var(--accent-2);
+      box-shadow: 0 5px 16px rgba(76,29,149,.10);
+      font-size: 18px;
+      font-weight: 900;
+    }
+    .desktop-sidebar-toggle:hover { background: #f8f3ff; }
+
+    .route-summary-wrap {
+      grid-column: 2;
+      grid-row: 2;
+      min-width: 0;
+      padding: 12px clamp(14px, 3vw, 40px) 14px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+    .route-summary-wrap .map-summary {
+      position: static;
+      left: auto; right: auto; bottom: auto;
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      gap: 8px;
+    }
+    .route-summary-wrap .route-choices { gap: 8px; }
+    .route-summary-wrap .route-choice { padding: 10px 12px; }
+    .route-summary-wrap .summary-stat { padding: 9px 11px; }
+    .route-summary-wrap .summary-stat strong { font-size: 17px; }
+
+    .below-map { grid-row: 3; padding-top: 28px; }
+    .details-grid { grid-template-columns: 1fr; }
+    .details-column { width: 100%; }
+
+    .elevation-visuals {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+    .elevation-chart-shell, .elevation-mini-map-shell { min-width: 0; }
+    .elevation-chart { height: 190px; touch-action: none; }
+    .elevation-mini-map {
+      width: 100%;
+      height: 190px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #f6f2fa;
+    }
+    .elevation-mini-map .leaflet-control-attribution { font-size: 8px; padding: 1px 3px; background: rgba(255,255,255,.82); }
+
+    .nutrition-launch-btn { min-height: 102px; }
+    .nutrition-panel.plan-ready > .nutrition-settings,
+    .nutrition-panel.plan-ready > .nutrition-food-title,
+    .nutrition-panel.plan-ready > .nutrition-foods,
+    .nutrition-panel.plan-ready > .nutrition-actions,
+    .nutrition-panel.plan-ready > .nutrition-note { display: none; }
+    .nutrition-panel.plan-ready .nutrition-plan { margin-top: 0; }
+    .nutrition-plan-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 2px;
+    }
+    .nutrition-plan-toolbar strong { font-size: 15px; }
+    .nutrition-plan-toolbar .btn { min-height: 36px; padding: 7px 10px; font-size: 11px; }
+
+    @media (min-width: 851px) {
+      .filter-panel { bottom: 54px; }
+    }
+
+    @media (max-width: 850px) {
+      .app { display: block; min-height: 100dvh; }
+      .map-wrap {
+        height: min(62dvh, 560px);
+        min-height: 410px;
+        max-height: 560px;
+      }
+      #map { height: 100%; min-height: 0; }
+      .desktop-sidebar-toggle { display: none; }
+      .route-summary-wrap { padding: 9px 8px 11px; }
+      .route-summary-wrap .map-summary {
+        position: static;
+        left: auto; right: auto; bottom: auto;
+        padding: 0;
+        max-height: none;
+        overflow: visible;
+        box-shadow: none;
+        background: transparent;
+        border: 0;
+      }
+      .route-summary-wrap .route-choice { padding: 8px 7px; }
+      .route-summary-wrap .summary-stat { padding: 7px 5px; text-align: center; }
+      .below-map { padding: 20px 10px 38px; }
+      .elevation-visuals { grid-template-columns: 1fr; gap: 8px; }
+      .elevation-chart { height: 150px; }
+      .elevation-mini-map { height: 170px; border-radius: 10px; }
+      .nutrition-launch-btn { min-height: 96px; }
+      .nutrition-plan-toolbar { align-items: flex-start; }
+      .nutrition-plan-toolbar .btn { min-height: 40px; }
+    }
+
+    @media (max-width: 520px) {
+      .map-wrap { height: 58dvh; min-height: 390px; max-height: 500px; }
+      .route-summary-wrap { padding-left: 6px; padding-right: 6px; }
+      .route-summary-wrap .route-choices { gap: 5px; }
+      .route-summary-wrap .map-summary-stats { gap: 4px; }
+      .elevation-chart { height: 138px; }
+      .elevation-mini-map { height: 155px; }
+      .nutrition-plan-toolbar { flex-direction: column; }
+      .nutrition-plan-toolbar .btn { width: 100%; }
+    }
+
   </style>
 </head>
 <body>
-  <main class="app">
+  <main id="routeApp" class="app">
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">🚴</div>
@@ -955,20 +1108,9 @@
     <div id="mobileOverlay" class="mobile-overlay" aria-hidden="true"></div>
 
     <section class="map-wrap">
+      <button id="desktopSidebarToggle" class="desktop-sidebar-toggle" type="button" aria-label="Rétracter le menu" aria-expanded="true">←</button>
       <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Ouvrir les réglages">☰ Itinéraire</button>
       <div id="map" aria-label="Carte de planification d’itinéraire"></div>
-      <div class="map-summary" aria-live="polite">
-        <div id="routeChoices" class="route-choices hidden" aria-label="Choix de l’itinéraire"></div>
-        <div class="map-summary-main">
-          <div class="map-summary-stats">
-            <div class="summary-stat"><strong id="distanceStat">—</strong><span>Distance</span></div>
-            <div class="summary-stat"><strong id="timeStat">—</strong><span>Temps</span></div>
-            <div class="summary-stat"><strong id="ascendStat">—</strong><span>D+</span></div>
-            <div class="summary-stat"><strong id="descendStat">—</strong><span>D−</span></div>
-          </div>
-        </div>
-      </div>
-
       <aside id="filterPanel" class="filter-panel collapsed" aria-label="Filtres de la carte">
         <button id="filterToggleBtn" class="filter-panel-head" type="button" aria-expanded="false" aria-controls="filterBody">
           <span><strong>Filtres</strong><small>Points utiles sur le trajet</small></span>
@@ -987,6 +1129,20 @@
         </div>
       </aside>
       <button id="undoPointBtn" class="undo-point-btn" type="button" disabled aria-label="Annuler le dernier point ajouté">↶ Annuler le point</button>
+    </section>
+
+    <section class="route-summary-wrap" aria-label="Résumé du parcours">
+      <div class="map-summary" aria-live="polite">
+        <div id="routeChoices" class="route-choices hidden" aria-label="Choix de l’itinéraire"></div>
+        <div class="map-summary-main">
+          <div class="map-summary-stats">
+            <div class="summary-stat"><strong id="distanceStat">—</strong><span>Distance</span></div>
+            <div class="summary-stat"><strong id="timeStat">—</strong><span>Temps</span></div>
+            <div class="summary-stat"><strong id="ascendStat">—</strong><span>D+</span></div>
+            <div class="summary-stat"><strong id="descendStat">—</strong><span>D−</span></div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section id="routeDetails" class="below-map" aria-label="Détails du parcours">
@@ -1010,15 +1166,31 @@
                 <span class="elevation-title">Profil d’élévation</span>
                 <span id="elevationMeta" class="elevation-meta"></span>
               </div>
-              <svg id="elevationChart" class="elevation-chart" viewBox="0 0 760 130" preserveAspectRatio="none" role="img" aria-label="Altitude selon la distance">
-                <defs>
-                  <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop>
-                    <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop>
-                  </linearGradient>
-                </defs>
-              </svg>
+              <div class="elevation-visuals">
+                <div class="elevation-chart-shell">
+                  <svg id="elevationChart" class="elevation-chart" viewBox="0 0 760 130" preserveAspectRatio="none" role="img" aria-label="Altitude selon la distance">
+                    <defs>
+                      <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop>
+                        <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+                <div class="elevation-mini-map-shell">
+                  <div id="elevationMiniMap" class="elevation-mini-map" aria-label="Carte du parcours synchronisée avec le profil d’élévation"></div>
+                </div>
+              </div>
             </div>
+
+            <button id="nutritionOpenBtn" class="nutrition-launch-btn" type="button" aria-haspopup="dialog" aria-controls="nutritionModal">
+              <span class="nutrition-launch-copy">
+                <span class="nutrition-launch-kicker">Ravitaillement</span>
+                <span class="nutrition-launch-title">Plan nutritionnel</span>
+                <span id="nutritionLaunchHint" class="nutrition-launch-subtitle">Choisis tes aliments et crée un plan adapté à ton trajet.</span>
+              </span>
+              <span class="nutrition-launch-arrow" aria-hidden="true">→</span>
+            </button>
 
             <div id="roadTypePanel" class="roadtype-panel hidden" aria-label="Répartition des types de voie">
               <div class="roadtype-head">
@@ -1028,14 +1200,6 @@
               <div id="roadTypeBars" class="roadtype-bars"></div>
             </div>
           </div>
-          <button id="nutritionOpenBtn" class="nutrition-launch-btn" type="button" aria-haspopup="dialog" aria-controls="nutritionModal">
-            <span class="nutrition-launch-copy">
-              <span class="nutrition-launch-kicker">Ravitaillement</span>
-              <span class="nutrition-launch-title">Plan nutritionnel</span>
-              <span id="nutritionLaunchHint" class="nutrition-launch-subtitle">Choisis tes aliments et crée un plan adapté à ton trajet.</span>
-            </span>
-            <span class="nutrition-launch-arrow" aria-hidden="true">→</span>
-          </button>
         </div>
       </div>
     </section>
@@ -1089,6 +1253,7 @@
           <button id="nutritionGenerateBtn" class="btn btn-primary full" type="button" disabled>Créer mon plan nutrition</button>
         </div>
         <div id="nutritionPlan" class="nutrition-plan hidden">
+          <div class="nutrition-plan-toolbar"><strong>Ton plan</strong><button id="nutritionEditBtn" class="btn btn-soft" type="button">Modifier mes aliments</button></div>
           <div id="nutritionPlanSummary" class="nutrition-plan-summary"></div>
           <div id="nutritionTimeline" class="nutrition-timeline"></div>
         </div>
@@ -1101,7 +1266,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V33
+      // RouteVelo V34
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1141,6 +1306,7 @@
         elevationPanel: document.getElementById('elevationPanel'),
         elevationChart: document.getElementById('elevationChart'),
         elevationMeta: document.getElementById('elevationMeta'),
+        elevationMiniMap: document.getElementById('elevationMiniMap'),
         roadTypePanel: document.getElementById('roadTypePanel'),
         roadTypeBars: document.getElementById('roadTypeBars'),
         undoPointBtn: document.getElementById('undoPointBtn'),
@@ -1163,9 +1329,13 @@
         nutritionCustomName: document.getElementById('nutritionCustomName'),
         nutritionCustomCarbs: document.getElementById('nutritionCustomCarbs'),
         nutritionGenerateBtn: document.getElementById('nutritionGenerateBtn'),
+        nutritionEditBtn: document.getElementById('nutritionEditBtn'),
         nutritionPlan: document.getElementById('nutritionPlan'),
         nutritionPlanSummary: document.getElementById('nutritionPlanSummary'),
-        nutritionTimeline: document.getElementById('nutritionTimeline')
+        nutritionTimeline: document.getElementById('nutritionTimeline'),
+        routeApp: document.getElementById('routeApp'),
+        desktopSidebarToggle: document.getElementById('desktopSidebarToggle'),
+        sidebar: document.querySelector('.sidebar')
       };
 
       const state = {
@@ -1182,6 +1352,9 @@
         routeEncoded: '',
         routeSafe: false,
         elevationCursorMarker: null,
+        elevationMiniMapInstance: null,
+        elevationMiniRouteLayer: null,
+        elevationMiniCursorMarker: null,
         currentRoute: null,
         nutritionPlanActive: false,
         routeOptions: [],
@@ -1244,15 +1417,60 @@
         return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`;
       }
 
+      function ensureElevationMiniMap() {
+        if (state.elevationMiniMapInstance || !els.elevationMiniMap) return state.elevationMiniMapInstance;
+        const mini = L.map(els.elevationMiniMap, {
+          zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false,
+          doubleClickZoom: false, boxZoom: false, keyboard: false, preferCanvas: true,
+          zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false
+        }).setView([46.6, 2.5], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(mini);
+        state.elevationMiniMapInstance = mini;
+        return mini;
+      }
+
+      function clearElevationMiniRoute() {
+        if (state.elevationMiniMapInstance && state.elevationMiniRouteLayer) {
+          state.elevationMiniMapInstance.removeLayer(state.elevationMiniRouteLayer);
+          state.elevationMiniRouteLayer = null;
+        }
+      }
+
+      function syncElevationMiniRoute(coords) {
+        if (!Array.isArray(coords) || coords.length < 2) return;
+        const mini = ensureElevationMiniMap();
+        if (!mini) return;
+        clearElevationMiniRoute();
+        const display = simplifyRouteDouglasPeucker(coords, 18);
+        const latlngs = display.map(c => [c[1], c[0]]);
+        const outline = L.polyline(latlngs, { color: '#ffffff', weight: 7, opacity: .95, interactive: false });
+        const main = L.polyline(latlngs, { color: '#7c3aed', weight: 4, opacity: 1, interactive: false });
+        state.elevationMiniRouteLayer = L.featureGroup([outline, main]).addTo(mini);
+        requestAnimationFrame(() => {
+          mini.invalidateSize(false);
+          if (state.elevationMiniRouteLayer?.getBounds().isValid()) {
+            mini.fitBounds(state.elevationMiniRouteLayer.getBounds(), { padding: [12, 12], maxZoom: 15, animate: false });
+          }
+        });
+      }
+
       function clearElevationMapCursor() {
         if (state.elevationCursorMarker) {
           map.removeLayer(state.elevationCursorMarker);
           state.elevationCursorMarker = null;
         }
+        if (state.elevationMiniMapInstance && state.elevationMiniCursorMarker) {
+          state.elevationMiniMapInstance.removeLayer(state.elevationMiniCursorMarker);
+          state.elevationMiniCursorMarker = null;
+        }
       }
 
       function resetElevationProfile() {
         clearElevationMapCursor();
+        clearElevationMiniRoute();
         if (els.elevationPanel) els.elevationPanel.classList.add('hidden');
         if (els.elevationMeta) els.elevationMeta.textContent = '';
         if (els.elevationChart) {
@@ -1306,6 +1524,22 @@
           }).addTo(map);
         } else {
           state.elevationCursorMarker.setLatLng(latlng);
+        }
+
+        const mini = ensureElevationMiniMap();
+        if (mini) {
+          if (!state.elevationMiniCursorMarker) {
+            state.elevationMiniCursorMarker = L.marker(latlng, {
+              interactive: false, keyboard: false, zIndexOffset: 3000,
+              icon: L.divIcon({
+                className: 'elevation-map-marker',
+                html: '<div class="elevation-map-dot"></div>',
+                iconSize: [20, 20], iconAnchor: [10, 10]
+              })
+            }).addTo(mini);
+          } else {
+            state.elevationMiniCursorMarker.setLatLng(latlng);
+          }
         }
       }
 
@@ -1361,6 +1595,8 @@
         els.elevationChart.innerHTML = `<defs><linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop><stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop></linearGradient></defs>${grid}<line class="elevation-baseline" x1="${left}" y1="${baseY}" x2="${W-right}" y2="${baseY}"></line><path class="elevation-area" d="${areaPath}"></path><polyline class="elevation-line" points="${linePoints}"></polyline><g id="elevationCursor"><line id="elevationCursorLine" class="elevation-cursor-line" x1="${initialX.toFixed(1)}" y1="${top}" x2="${initialX.toFixed(1)}" y2="${top + plotH}"></line><circle id="elevationCursorDot" class="elevation-cursor-dot" cx="${initialX.toFixed(1)}" cy="${initialY.toFixed(1)}" r="4.7"></circle><circle id="elevationCursorHandle" class="elevation-cursor-handle" cx="${initialX.toFixed(1)}" cy="${top + 3}" r="4.4"></circle><rect id="elevationCursorLabelBg" class="elevation-cursor-label-bg" x="${left + 5}" y="${top + 5}" width="126" height="17" rx="6"></rect><text id="elevationCursorLabel" class="elevation-cursor-label" x="${left + 12}" y="${top + 17}">0 km · ${Math.round(initial.h)} m · 0%</text></g>`;
         els.elevationMeta.textContent = `Glisse sur le profil · ${Math.round(rawMin)}–${Math.round(rawMax)} m`;
         els.elevationPanel.classList.remove('hidden');
+        syncElevationMiniRoute(state.routeCoords);
+        showElevationMapCursor(initial);
 
         const cursorLine = els.elevationChart.querySelector('#elevationCursorLine');
         const cursorDot = els.elevationChart.querySelector('#elevationCursorDot');
@@ -1513,6 +1749,7 @@
 
       function openNutritionModal() {
         if (!els.nutritionModal) return;
+        if (els.nutritionPanel) els.nutritionPanel.classList.toggle('plan-ready', Boolean(state.nutritionPlanActive && !els.nutritionPlan?.classList.contains('hidden')));
         els.nutritionModal.classList.remove('hidden');
         els.nutritionModal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('nutrition-modal-open');
@@ -1535,6 +1772,7 @@
 
       function resetNutritionPlan({ keepActive = false } = {}) {
         if (!keepActive) state.nutritionPlanActive = false;
+        if (els.nutritionPanel) els.nutritionPanel.classList.remove('plan-ready');
         if (els.nutritionPlan) els.nutritionPlan.classList.add('hidden');
         if (els.nutritionPlanSummary) els.nutritionPlanSummary.textContent = '';
         if (els.nutritionTimeline) els.nutritionTimeline.innerHTML = '';
@@ -1558,6 +1796,7 @@
         const foods = settings.foods.filter(food => food.enabled && food.carbs > 0 && food.name.trim());
         if (!foods.length) {
           state.nutritionPlanActive = false;
+          if (els.nutritionPanel) els.nutritionPanel.classList.remove('plan-ready');
           els.nutritionPlan.classList.remove('hidden');
           els.nutritionPlanSummary.textContent = 'Choisis au moins un aliment avant de créer le plan.';
           els.nutritionTimeline.innerHTML = '';
@@ -1600,7 +1839,16 @@
           return `<div class="nutrition-event"><div class="nutrition-event-time"><strong>${formatNutritionClock(event.minutes)}</strong><span>${event.km.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km · ${event.pct}%</span></div><div class="nutrition-event-main"><strong>${escapeHtml(foodText)}</strong><small>≈ ${Math.round(event.carbs)} g glucides · ${event.water} ml d’eau</small></div></div>`;
         }).join('');
         els.nutritionPlan.classList.remove('hidden');
+        if (els.nutritionPanel) els.nutritionPanel.classList.add('plan-ready');
+        if (els.nutritionDialog) els.nutritionDialog.scrollTo({ top: 0, behavior: 'smooth' });
         return true;
+      }
+
+      function editNutritionPlan() {
+        state.nutritionPlanActive = false;
+        if (els.nutritionPanel) els.nutritionPanel.classList.remove('plan-ready');
+        if (els.nutritionPlan) els.nutritionPlan.classList.add('hidden');
+        if (els.nutritionDialog) els.nutritionDialog.scrollTo({ top: 0, behavior: 'smooth' });
       }
 
       function resetStats() {
@@ -3559,6 +3807,31 @@
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
+      const SIDEBAR_STORAGE_KEY = 'routevelo-sidebar-collapsed-v1';
+
+      function setDesktopSidebarCollapsed(collapsed, persist = true) {
+        if (!els.routeApp || !els.desktopSidebarToggle) return;
+        const shouldCollapse = Boolean(collapsed && window.innerWidth > 850);
+        els.routeApp.classList.toggle('sidebar-collapsed', shouldCollapse);
+        els.desktopSidebarToggle.textContent = shouldCollapse ? '☰' : '←';
+        els.desktopSidebarToggle.setAttribute('aria-expanded', String(!shouldCollapse));
+        els.desktopSidebarToggle.setAttribute('aria-label', shouldCollapse ? 'Afficher le menu itinéraire' : 'Rétracter le menu itinéraire');
+        els.desktopSidebarToggle.title = shouldCollapse ? 'Afficher le menu' : 'Rétracter le menu';
+        if (persist) {
+          try { localStorage.setItem(SIDEBAR_STORAGE_KEY, shouldCollapse ? '1' : '0'); } catch (_) {}
+        }
+        window.setTimeout(() => {
+          map.invalidateSize(false);
+          state.elevationMiniMapInstance?.invalidateSize(false);
+        }, 240);
+      }
+
+      function restoreDesktopSidebarState() {
+        let collapsed = false;
+        try { collapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1'; } catch (_) {}
+        setDesktopSidebarCollapsed(collapsed, false);
+      }
+
       function openMobilePanel() {
         document.body.classList.add('mobile-panel-open');
         setTimeout(() => map.invalidateSize(), 240);
@@ -3578,10 +3851,20 @@
         else closeMobilePanel();
       });
       window.addEventListener('resize', () => {
-        if (window.innerWidth > 850) document.body.classList.remove('mobile-panel-open');
+        if (window.innerWidth > 850) {
+          document.body.classList.remove('mobile-panel-open');
+          restoreDesktopSidebarState();
+        } else if (els.routeApp) {
+          els.routeApp.classList.remove('sidebar-collapsed');
+        }
         map.invalidateSize();
+        state.elevationMiniMapInstance?.invalidateSize(false);
         positionUndoPointButton();
       });
+      els.desktopSidebarToggle?.addEventListener('click', () => {
+        setDesktopSidebarCollapsed(!els.routeApp.classList.contains('sidebar-collapsed'));
+      });
+      restoreDesktopSidebarState();
 
       function positionUndoPointButton() {
         if (!els.undoPointBtn || !els.filterPanel) return;
@@ -3634,6 +3917,7 @@
       els.nutritionModalClose?.addEventListener('click', closeNutritionModal);
       els.nutritionModalBackdrop?.addEventListener('click', closeNutritionModal);
       els.nutritionGenerateBtn.addEventListener('click', generateNutritionPlan);
+      els.nutritionEditBtn?.addEventListener('click', editNutritionPlan);
       [els.nutritionCarbsRate, els.nutritionWaterRate].forEach(control => control.addEventListener('change', () => {
         saveNutritionSettings();
         if (state.nutritionPlanActive) generateNutritionPlan();
