@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- RouteVelo V32 -->
+<!-- RouteVelo V33 -->
 <html lang="fr">
 <head>
   <!-- RouteVelo V26 -->
@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="32" />
+  <meta name="routevelo-version" content="33" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -402,6 +402,109 @@
     .nutrition-event-main small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.35; }
     .nutrition-note { margin-top: 10px; color: var(--muted); font-size: 10px; line-height: 1.45; }
 
+    /* V33 — le plan nutritionnel s'ouvre dans une fenêtre dédiée. */
+    .nutrition-launch-btn {
+      width: 100%;
+      min-height: 142px;
+      padding: 18px;
+      border: 1px solid #e5d8fb;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #ffffff 0%, #f9f4ff 58%, #fff3f8 100%);
+      box-shadow: 0 8px 24px rgba(76,29,149,.06);
+      color: var(--text);
+      text-align: left;
+      display: grid;
+      grid-template-columns: minmax(0,1fr) auto;
+      align-items: center;
+      gap: 14px;
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+    }
+    .nutrition-launch-btn:hover { transform: translateY(-1px); border-color: #cfb8f8; box-shadow: 0 12px 28px rgba(76,29,149,.10); }
+    .nutrition-launch-copy { min-width: 0; }
+    .nutrition-launch-kicker { color: var(--pink); font-size: 10px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .nutrition-launch-title { display: block; margin-top: 4px; font-size: 17px; font-weight: 900; letter-spacing: -.015em; }
+    .nutrition-launch-subtitle { display: block; margin-top: 5px; max-width: 330px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .nutrition-launch-arrow { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: var(--accent); color: #fff; font-size: 20px; font-weight: 900; box-shadow: 0 7px 18px rgba(124,58,237,.18); }
+
+    body.nutrition-modal-open { overflow: hidden !important; }
+    .nutrition-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+    .nutrition-modal.hidden { display: none; }
+    .nutrition-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(34,20,48,.48);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      opacity: 0;
+      transition: opacity .18s ease;
+    }
+    .nutrition-dialog {
+      position: relative;
+      z-index: 1;
+      width: min(700px, 100%);
+      max-height: min(88dvh, 820px);
+      overflow: auto;
+      overscroll-behavior: contain;
+      border: 1px solid #e7dcf2;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 28px 80px rgba(42,18,62,.28);
+      opacity: 0;
+      transform: translateY(12px) scale(.985);
+      transition: transform .18s ease, opacity .18s ease;
+      scrollbar-width: thin;
+      scrollbar-color: #d9c9f4 transparent;
+    }
+    .nutrition-modal.is-open .nutrition-modal-backdrop { opacity: 1; }
+    .nutrition-modal.is-open .nutrition-dialog { opacity: 1; transform: translateY(0) scale(1); }
+    .nutrition-dialog-head {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 16px 16px 13px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.97);
+    }
+    .nutrition-dialog-kicker { color: var(--pink); font-size: 9px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+    .nutrition-dialog-title { margin: 2px 0 0; font-size: 20px; letter-spacing: -.02em; }
+    .nutrition-dialog .nutrition-subtitle { max-width: 520px; }
+    .nutrition-modal-close {
+      flex: none;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: #fff;
+      color: var(--text);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .nutrition-modal-close:hover { background: #f8f4ff; }
+    .nutrition-dialog .nutrition-panel {
+      position: static;
+      top: auto;
+      padding: 16px;
+      border: 0;
+      border-radius: 0;
+      background: #fff;
+      box-shadow: none;
+    }
+    .nutrition-dialog .nutrition-actions { position: sticky; bottom: 0; z-index: 4; padding: 10px 0 max(2px, env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(255,255,255,.70), #fff 28%); }
+    .nutrition-dialog .nutrition-actions .btn { min-height: 48px; }
+
     .elevation-panel {
       min-width: 0;
       padding: 10px 10px 7px;
@@ -724,6 +827,28 @@
       .gpx-map-btn { width: 100%; }
       .nutrition-settings { grid-template-columns: 1fr; }
       .nutrition-event { grid-template-columns: 58px minmax(0, 1fr); }
+      .nutrition-launch-btn { min-height: 112px; padding: 14px; border-radius: 14px; }
+      .nutrition-launch-title { font-size: 16px; }
+      .nutrition-launch-arrow { width: 40px; height: 40px; }
+      .nutrition-modal { padding: 0; place-items: end center; }
+      .nutrition-dialog {
+        width: 100%;
+        max-height: 92dvh;
+        border-left: 0;
+        border-right: 0;
+        border-bottom: 0;
+        border-radius: 22px 22px 0 0;
+        transform: translateY(26px);
+      }
+      .nutrition-modal.is-open .nutrition-dialog { transform: translateY(0); }
+      .nutrition-dialog-head { padding: 13px 12px 11px; padding-top: max(13px, env(safe-area-inset-top)); }
+      .nutrition-dialog-title { font-size: 18px; }
+      .nutrition-modal-close { width: 44px; height: 44px; }
+      .nutrition-dialog .nutrition-panel { padding: 12px 12px max(18px, env(safe-area-inset-bottom)); }
+      .nutrition-food-row { min-height: 50px; padding: 8px 9px; }
+      .nutrition-food-row input[type="checkbox"] { width: 21px; height: 21px; }
+      .nutrition-carb-field input, .nutrition-custom-name { min-height: 40px !important; font-size: 16px !important; }
+      .nutrition-settings select { min-height: 46px; font-size: 16px; }
     }
 
     /* V26 — DA rose/violet sobre + profil d'élévation SVG léger. */
@@ -903,61 +1028,80 @@
               <div id="roadTypeBars" class="roadtype-bars"></div>
             </div>
           </div>
-
-          <section id="nutritionPanel" class="nutrition-panel" aria-label="Plan nutritionnel">
-            <div class="nutrition-head">
-              <div><div class="nutrition-title">Plan nutritionnel</div><div id="nutritionRouteHint" class="nutrition-subtitle">Calcule un trajet pour créer ton plan.</div></div>
-            </div>
-            <div class="nutrition-settings">
-              <label>Objectif glucides / h
-                <select id="nutritionCarbsRate">
-                  <option value="30">30 g/h</option>
-                  <option value="45">45 g/h</option>
-                  <option value="60" selected>60 g/h</option>
-                  <option value="75">75 g/h</option>
-                  <option value="90">90 g/h</option>
-                </select>
-              </label>
-              <label>Eau / h
-                <select id="nutritionWaterRate">
-                  <option value="300">300 ml/h</option>
-                  <option value="500" selected>500 ml/h</option>
-                  <option value="650">650 ml/h</option>
-                  <option value="750">750 ml/h</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="nutrition-food-title">Choisis ce que tu veux emporter · glucides par portion modifiables</div>
-            <div id="nutritionFoods" class="nutrition-foods">
-              <div class="nutrition-food-row" data-food="bonbons"><input class="nutrition-food-check" type="checkbox" checked /><span class="nutrition-food-name">🍬 Bonbons</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" /> g</span></div>
-              <div class="nutrition-food-row" data-food="gel"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">⚡ Gel</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="25" /> g</span></div>
-              <div class="nutrition-food-row" data-food="pate-fruit"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍓 Pâte de fruit</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" /> g</span></div>
-              <div class="nutrition-food-row" data-food="barre"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥣 Barre</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" /> g</span></div>
-              <div class="nutrition-food-row" data-food="compote"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍎 Compote</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="18" /> g</span></div>
-              <div class="nutrition-food-row" data-food="banane"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍌 Banane</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="23" /> g</span></div>
-              <div class="nutrition-food-row" data-food="boisson"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥤 Boisson énergétique</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" /> g</span></div>
-              <div class="nutrition-food-row" data-food="custom"><input id="nutritionCustomEnabled" class="nutrition-food-check" type="checkbox" /><input id="nutritionCustomName" class="nutrition-custom-name" type="text" placeholder="Autre aliment" /><span class="nutrition-carb-field"><input id="nutritionCustomCarbs" class="nutrition-food-carbs" type="number" min="1" max="100" value="25" /> g</span></div>
-            </div>
-            <div class="nutrition-actions">
-              <button id="nutritionGenerateBtn" class="btn btn-primary full" type="button" disabled>Créer mon plan nutrition</button>
-            </div>
-            <div id="nutritionPlan" class="nutrition-plan hidden">
-              <div id="nutritionPlanSummary" class="nutrition-plan-summary"></div>
-              <div id="nutritionTimeline" class="nutrition-timeline"></div>
-            </div>
-            <div class="nutrition-note">Les quantités sont des repères personnalisables. Modifie les valeurs selon les produits que tu utilises et ce que tu tolères pendant l’effort.</div>
-          </section>
+          <button id="nutritionOpenBtn" class="nutrition-launch-btn" type="button" aria-haspopup="dialog" aria-controls="nutritionModal">
+            <span class="nutrition-launch-copy">
+              <span class="nutrition-launch-kicker">Ravitaillement</span>
+              <span class="nutrition-launch-title">Plan nutritionnel</span>
+              <span id="nutritionLaunchHint" class="nutrition-launch-subtitle">Choisis tes aliments et crée un plan adapté à ton trajet.</span>
+            </span>
+            <span class="nutrition-launch-arrow" aria-hidden="true">→</span>
+          </button>
         </div>
       </div>
     </section>
   </main>
 
+
+  <div id="nutritionModal" class="nutrition-modal hidden" aria-hidden="true">
+    <div id="nutritionModalBackdrop" class="nutrition-modal-backdrop"></div>
+    <div id="nutritionDialog" class="nutrition-dialog" role="dialog" aria-modal="true" aria-labelledby="nutritionModalTitle" tabindex="-1">
+      <div class="nutrition-dialog-head">
+        <div>
+          <div class="nutrition-dialog-kicker">RouteVelo · ravitaillement</div>
+          <h2 id="nutritionModalTitle" class="nutrition-dialog-title">Plan nutritionnel</h2>
+          <div id="nutritionRouteHint" class="nutrition-subtitle">Calcule un trajet pour créer ton plan.</div>
+        </div>
+        <button id="nutritionModalClose" class="nutrition-modal-close" type="button" aria-label="Fermer le plan nutritionnel">×</button>
+      </div>
+      <section id="nutritionPanel" class="nutrition-panel" aria-label="Réglages du plan nutritionnel">
+        <div class="nutrition-settings">
+          <label>Objectif glucides / h
+            <select id="nutritionCarbsRate">
+              <option value="30">30 g/h</option>
+              <option value="45">45 g/h</option>
+              <option value="60" selected>60 g/h</option>
+              <option value="75">75 g/h</option>
+              <option value="90">90 g/h</option>
+            </select>
+          </label>
+          <label>Eau / h
+            <select id="nutritionWaterRate">
+              <option value="300">300 ml/h</option>
+              <option value="500" selected>500 ml/h</option>
+              <option value="650">650 ml/h</option>
+              <option value="750">750 ml/h</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="nutrition-food-title">Choisis ce que tu veux emporter · glucides par portion modifiables</div>
+        <div id="nutritionFoods" class="nutrition-foods">
+          <div class="nutrition-food-row" data-food="bonbons"><input class="nutrition-food-check" type="checkbox" checked /><span class="nutrition-food-name">🍬 Bonbons</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" /> g</span></div>
+          <div class="nutrition-food-row" data-food="gel"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">⚡ Gel</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="25" /> g</span></div>
+          <div class="nutrition-food-row" data-food="pate-fruit"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍓 Pâte de fruit</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" /> g</span></div>
+          <div class="nutrition-food-row" data-food="barre"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥣 Barre</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" /> g</span></div>
+          <div class="nutrition-food-row" data-food="compote"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍎 Compote</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="18" /> g</span></div>
+          <div class="nutrition-food-row" data-food="banane"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍌 Banane</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="23" /> g</span></div>
+          <div class="nutrition-food-row" data-food="boisson"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥤 Boisson énergétique</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" /> g</span></div>
+          <div class="nutrition-food-row" data-food="custom"><input id="nutritionCustomEnabled" class="nutrition-food-check" type="checkbox" /><input id="nutritionCustomName" class="nutrition-custom-name" type="text" placeholder="Autre aliment" /><span class="nutrition-carb-field"><input id="nutritionCustomCarbs" class="nutrition-food-carbs" type="number" min="1" max="100" value="25" /> g</span></div>
+        </div>
+        <div class="nutrition-actions">
+          <button id="nutritionGenerateBtn" class="btn btn-primary full" type="button" disabled>Créer mon plan nutrition</button>
+        </div>
+        <div id="nutritionPlan" class="nutrition-plan hidden">
+          <div id="nutritionPlanSummary" class="nutrition-plan-summary"></div>
+          <div id="nutritionTimeline" class="nutrition-timeline"></div>
+        </div>
+        <div class="nutrition-note">Les quantités sont des repères personnalisables. Modifie les valeurs selon les produits que tu utilises et ce que tu tolères pendant l’effort.</div>
+      </section>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
     (() => {
       'use strict';
-      // RouteVelo V32
+      // RouteVelo V33
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1004,6 +1148,12 @@
         filterToggleBtn: document.getElementById('filterToggleBtn'),
         filterBody: document.getElementById('filterBody'),
         filterChevron: document.getElementById('filterChevron'),
+        nutritionOpenBtn: document.getElementById('nutritionOpenBtn'),
+        nutritionLaunchHint: document.getElementById('nutritionLaunchHint'),
+        nutritionModal: document.getElementById('nutritionModal'),
+        nutritionDialog: document.getElementById('nutritionDialog'),
+        nutritionModalBackdrop: document.getElementById('nutritionModalBackdrop'),
+        nutritionModalClose: document.getElementById('nutritionModalClose'),
         nutritionPanel: document.getElementById('nutritionPanel'),
         nutritionRouteHint: document.getElementById('nutritionRouteHint'),
         nutritionCarbsRate: document.getElementById('nutritionCarbsRate'),
@@ -1350,11 +1500,37 @@
         const route = state.currentRoute;
         const hasRoute = Boolean(route && Number(route.distance) > 0 && Number(route.time) > 0);
         if (els.nutritionGenerateBtn) els.nutritionGenerateBtn.disabled = !hasRoute;
-        if (els.nutritionRouteHint) {
-          els.nutritionRouteHint.textContent = hasRoute
-            ? `${fmtKm(route.distance)} · ${fmtTime(route.time)} — choisis tes aliments puis génère le plan.`
-            : 'Calcule un trajet pour créer ton plan.';
+        const routeText = hasRoute
+          ? `${fmtKm(route.distance)} · ${fmtTime(route.time)} — choisis tes aliments puis génère le plan.`
+          : 'Calcule un trajet pour créer ton plan.';
+        if (els.nutritionRouteHint) els.nutritionRouteHint.textContent = routeText;
+        if (els.nutritionLaunchHint) {
+          els.nutritionLaunchHint.textContent = hasRoute
+            ? `${fmtKm(route.distance)} · ${fmtTime(route.time)} — ouvrir le plan.`
+            : 'Choisis tes aliments et prépare ton plan pour le prochain trajet.';
         }
+      }
+
+      function openNutritionModal() {
+        if (!els.nutritionModal) return;
+        els.nutritionModal.classList.remove('hidden');
+        els.nutritionModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('nutrition-modal-open');
+        requestAnimationFrame(() => {
+          els.nutritionModal.classList.add('is-open');
+          els.nutritionModalClose?.focus({ preventScroll: true });
+        });
+      }
+
+      function closeNutritionModal() {
+        if (!els.nutritionModal || els.nutritionModal.classList.contains('hidden')) return;
+        els.nutritionModal.classList.remove('is-open');
+        els.nutritionModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('nutrition-modal-open');
+        window.setTimeout(() => {
+          if (!els.nutritionModal.classList.contains('is-open')) els.nutritionModal.classList.add('hidden');
+        }, 180);
+        els.nutritionOpenBtn?.focus({ preventScroll: true });
       }
 
       function resetNutritionPlan({ keepActive = false } = {}) {
@@ -3397,7 +3573,9 @@
       els.mobileCloseBtn.addEventListener('click', closeMobilePanel);
       els.mobileOverlay.addEventListener('click', closeMobilePanel);
       document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') closeMobilePanel();
+        if (e.key !== 'Escape') return;
+        if (els.nutritionModal && !els.nutritionModal.classList.contains('hidden')) closeNutritionModal();
+        else closeMobilePanel();
       });
       window.addEventListener('resize', () => {
         if (window.innerWidth > 850) document.body.classList.remove('mobile-panel-open');
@@ -3452,6 +3630,9 @@
       els.gpxBtn.addEventListener('click', downloadGpx);
       loadNutritionSettings();
       updateNutritionAvailability();
+      els.nutritionOpenBtn?.addEventListener('click', openNutritionModal);
+      els.nutritionModalClose?.addEventListener('click', closeNutritionModal);
+      els.nutritionModalBackdrop?.addEventListener('click', closeNutritionModal);
       els.nutritionGenerateBtn.addEventListener('click', generateNutritionPlan);
       [els.nutritionCarbsRate, els.nutritionWaterRate].forEach(control => control.addEventListener('change', () => {
         saveNutritionSettings();

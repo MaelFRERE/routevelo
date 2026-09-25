@@ -1,4 +1,4 @@
-# RouteVelo V32
+# RouteVelo V33
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -198,3 +198,11 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - L’utilisateur choisit ses aliments (bonbons, gels, pâtes de fruit, barres, compotes, banane, boisson énergétique ou aliment personnalisé) et peut modifier les glucides par portion.
 - Les objectifs de glucides par heure et d’eau par heure sont réglables et sauvegardés localement dans le navigateur.
 - Le plan répartit les prises sur la sortie avec l’heure de passage, le kilomètre, le pourcentage du parcours, les glucides et l’eau.
+
+
+## V33 — plan nutritionnel en fenêtre
+- Le plan nutritionnel n'occupe plus la page : un bouton dédié ouvre une fenêtre.
+- Fenêtre centrée sur ordinateur et bottom sheet plein largeur sur mobile.
+- Fermeture par X, fond assombri ou touche Échap.
+- Bouton de génération optimisé pour le tactile et conservé visible pendant le défilement.
+- Réglages, aliments personnalisés, sauvegarde locale et génération du plan sont conservés.
