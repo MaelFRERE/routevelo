@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- RouteVelo V27 -->
+<!-- RouteVelo V30 -->
 <html lang="fr">
 <head>
   <!-- RouteVelo V26 -->
@@ -791,7 +791,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V29
+      // RouteVelo V30
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1592,7 +1592,9 @@
         state.routeDistanceCoords = simplifyRouteDouglasPeucker(route.coords, 12);
         state.routeEncoded = route.encoded;
         state.routeSafe = false;
-        els.gpxBtn.disabled = true;
+        // V30 : un itineraire affiche peut toujours etre exporte.
+        // Le controle de surface reste informatif mais ne bloque plus le GPX.
+        els.gpxBtn.disabled = !state.routeCoords.length;
         if (state.routeLayer) map.removeLayer(state.routeLayer);
         const displayCoords = simplifyRouteDouglasPeucker(route.coords, window.innerWidth <= 850 ? 12 : 8);
         const latlngs = displayCoords.map(c => [c[1], c[0]]);
@@ -1727,12 +1729,12 @@
         const unique = [...new Set(problems)];
         if (unique.length) {
           state.routeSafe = false;
-          els.gpxBtn.disabled = true;
-          setStatus(`Trajet refusé : ${unique.slice(0, 5).join(', ')}. Déplacez un point de passage pour forcer une route/piste cyclable goudronnée.`, 'error');
+          els.gpxBtn.disabled = !state.routeCoords.length;
+          setStatus(`Attention : ${unique.slice(0, 5).join(', ')}. Le GPX reste disponible si vous souhaitez conserver ce tracé.`, 'warn');
         } else if (unknown) {
           state.routeSafe = false;
-          els.gpxBtn.disabled = true;
-          setStatus('Trajet non validé : certains segments n’ont pas assez d’informations de surface. Export GPX bloqué par précaution.', 'warn');
+          els.gpxBtn.disabled = !state.routeCoords.length;
+          setStatus('Certains segments n’ont pas assez d’informations de surface. Le GPX reste disponible.', 'warn');
         } else {
           state.routeSafe = true;
           els.gpxBtn.disabled = false;
@@ -1840,8 +1842,8 @@
         auditRoute(route, serial).catch((err) => {
           if (serial === state.requestSerial) {
             state.routeSafe = false;
-            els.gpxBtn.disabled = true;
-            setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Export GPX bloqué par précaution.`, 'error');
+            els.gpxBtn.disabled = !state.routeCoords.length;
+            setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Le GPX reste disponible.`, 'warn');
           }
         });
         loadElevation(route, serial).catch(() => {});
@@ -1879,8 +1881,8 @@
           auditRoute(route, serial).catch((err) => {
             if (serial === state.requestSerial) {
               state.routeSafe = false;
-              els.gpxBtn.disabled = true;
-              setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Export GPX bloqué par précaution.`, 'error');
+              els.gpxBtn.disabled = !state.routeCoords.length;
+              setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Le GPX reste disponible.`, 'warn');
             }
           });
           loadElevation(route, serial).catch(() => {});
@@ -2894,7 +2896,9 @@
       }
 
       function downloadGpx() {
-        if (!state.routeCoords.length || !state.routeSafe) return;
+        // V30 : l'export depend uniquement de la presence d'un trace.
+        // routeSafe continue de refleter le controle de surface sans bloquer l'utilisateur.
+        if (!state.routeCoords.length) return;
         const track = state.routeCoords.map(c => `    <trkpt lat="${c[1]}" lon="${c[0]}"></trkpt>`).join('\n');
         const poiWpts = [];
         if (els.waterToggle.checked) {

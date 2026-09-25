@@ -1,4 +1,4 @@
-# RouteVelo V28
+# RouteVelo V30
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -174,3 +174,10 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Tous les itinéraires passent désormais par un nettoyage géométrique qui détecte les petites excroissances revenant presque au même point et les coupe automatiquement.
 - Le nettoyage s’applique aux trajets A → B, A → B → A, aux boucles et aux tracés recalculés après ajout d’un point.
 - La fermeture normale d’une vraie boucle n’est pas supprimée.
+
+## V30 — export GPX toujours disponible
+
+- Le bouton GPX est activé dès qu'un itinéraire est réellement affiché.
+- Le contrôle strict du revêtement reste exécuté pour l'analyse et le type de route.
+- Un segment inconnu, un avertissement de surface ou une indisponibilité temporaire du contrôle ne bloque plus l'export.
+- Le GPX conserve le tracé actuellement sélectionné, ainsi que les POI activés.
