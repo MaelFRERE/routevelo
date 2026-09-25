@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
+  <meta name="routevelo-version" content="14" />
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <style>
@@ -310,7 +311,7 @@
       gap: 8px;
     }
     .summary-status { flex: 1 1 auto; min-width: 0; padding: 8px 10px; }
-    .gpx-map-btn { flex: none; min-height: 40px; white-space: nowrap; }
+    .gpx-map-btn { flex: 1 1 auto; min-height: 40px; white-space: nowrap; }
 
     .filter-panel {
       position: absolute;
@@ -461,18 +462,18 @@
         gap: 6px;
         border-radius: 13px;
         max-height: none;
-        overflow: visible;
-        display: flex;
-        flex-direction: column;
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto auto;
       }
-      .map-summary-main { display: block; }
+      .map-summary-main { display: grid; grid-template-rows: auto auto; gap: 6px; min-width: 0; }
       .map-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
       .summary-stat { padding: 6px 5px; text-align: center; }
       .summary-stat strong { font-size: 14px; }
       .summary-stat span { font-size: 9px; }
-      .map-summary-actions { display: grid; grid-template-columns: 1fr auto; min-width: 0; gap: 6px; margin-top: 6px; }
-      .summary-status { min-width: 0; padding: 7px 8px; font-size: 10px; max-height: 48px; overflow: auto; }
-      .gpx-map-btn { width: auto; min-height: 44px; padding: 8px 11px; }
+      .map-summary-actions { display: block; min-width: 0; margin-top: 0; }
+      .summary-status { display: none; }
+      .gpx-map-btn { display: block; width: 100%; min-height: 44px; padding: 8px 11px; }
       .route-choices {
         position: static;
         z-index: auto;
@@ -494,17 +495,14 @@
       .map-undo-btn {
         display: grid;
         place-items: center;
-        position: absolute;
-        z-index: 905;
-        top: calc(max(12px, env(safe-area-inset-top)) + 132px);
-        left: 10px;
         width: 44px;
         height: 44px;
+        margin: 8px 0 0 10px;
         border: 1px solid var(--line);
-        border-radius: 13px;
+        border-radius: 8px;
         background: rgba(255,255,255,.97);
         color: var(--text);
-        box-shadow: var(--shadow);
+        box-shadow: 0 1px 5px rgba(0,0,0,.18);
         font-size: 25px;
         font-weight: 850;
       }
@@ -526,7 +524,7 @@
       .toggle-label small { display: none; }
       .poi-symbol { width: 22px; height: 22px; font-size: 17px; }
       .poi-counts { display: none; }
-      .leaflet-control-zoom { margin-top: 66px !important; }
+      .leaflet-control-zoom { margin-top: 78px !important; }
     }
 
     @media (max-width: 520px) {
@@ -534,7 +532,7 @@
       .grid2 { grid-template-columns: minmax(0, 1fr) auto; }
       .map-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .summary-status { display: none; }
-      .map-summary-actions { display: flex; justify-content: flex-end; }
+      .map-summary-actions { display: block; }
       .gpx-map-btn { width: 100%; }
     }
   </style>
@@ -553,34 +551,25 @@
 
       <section class="section stack">
         <div class="section-title">Itinéraire</div>
-        <div class="segmented hidden" aria-label="Type de trajet">
+        <div class="segmented" aria-label="Type de trajet">
           <button id="modeAB" type="button" class="active">Départ → arrivée</button>
           <button id="modeLoop" type="button">Boucle</button>
         </div>
 
         <div id="abControls" class="stack">
           <label for="startSearch">Départ</label>
-          <div class="grid2">
-            <input id="startSearch" type="text" placeholder="Adresse ou ville" />
-            <button id="startSearchBtn" class="btn" type="button">Placer</button>
-          </div>
+          <input id="startSearch" type="text" placeholder="Ville ou adresse" />
           <div class="location-row">
             <button id="useLocationBtn" class="btn btn-soft full" type="button">⌖ Utiliser ma position comme départ</button>
             <div class="location-help">Le navigateur demandera l’autorisation d’utiliser la localisation de ce PC.</div>
           </div>
           <label for="endSearch">Arrivée</label>
-          <div class="grid2">
-            <input id="endSearch" type="text" placeholder="Adresse ou ville" />
-            <button id="endSearchBtn" class="btn" type="button">Placer</button>
-          </div>
+          <input id="endSearch" type="text" placeholder="Ville ou adresse" />
         </div>
 
         <div id="loopControls" class="stack hidden">
           <label for="loopSearch">Point de départ de la boucle</label>
-          <div class="grid2">
-            <input id="loopSearch" type="text" placeholder="Adresse ou ville" />
-            <button id="loopSearchBtn" class="btn" type="button">Placer</button>
-          </div>
+          <input id="loopSearch" type="text" placeholder="Ville ou adresse" />
           <div class="location-row">
             <button id="useLoopLocationBtn" class="btn btn-soft full" type="button">⌖ Démarrer la boucle depuis ma position</button>
             <div class="location-help">La précision dépend du GPS, du Wi‑Fi et des services de localisation disponibles sur le PC.</div>
@@ -588,9 +577,9 @@
           <label for="loopDistance">Distance moyenne cible</label>
           <div class="grid2">
             <input id="loopDistance" type="number" min="10" max="350" step="5" value="80" />
-            <button id="generateLoopBtn" class="btn btn-soft" type="button">Proposer 3 boucles</button>
+            <button id="generateLoopBtn" class="btn btn-primary" type="button">Calculer la boucle</button>
           </div>
-          <div class="note">Court ≈ 80 %, Moyen = distance saisie, Long ≈ 120 %. Les trois boucles sont générées automatiquement.</div>
+          <div class="note">Une seule boucle est générée autour de la distance cible saisie.</div>
         </div>
 
         <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer 3 itinéraires</button>
@@ -621,7 +610,6 @@
             <div class="summary-stat"><strong id="descendStat">—</strong><span>D−</span></div>
           </div>
           <div class="map-summary-actions">
-            <div id="surfaceStatus" class="status summary-status">Aucun itinéraire calculé.</div>
             <button id="gpxBtn" class="btn btn-primary gpx-map-btn" type="button" disabled>Télécharger GPX</button>
           </div>
         </div>
@@ -665,9 +653,6 @@
         startSearch: document.getElementById('startSearch'),
         endSearch: document.getElementById('endSearch'),
         loopSearch: document.getElementById('loopSearch'),
-        startSearchBtn: document.getElementById('startSearchBtn'),
-        endSearchBtn: document.getElementById('endSearchBtn'),
-        loopSearchBtn: document.getElementById('loopSearchBtn'),
         useLocationBtn: document.getElementById('useLocationBtn'),
         useLoopLocationBtn: document.getElementById('useLoopLocationBtn'),
         loopDistance: document.getElementById('loopDistance'),
@@ -688,7 +673,6 @@
         timeStat: document.getElementById('timeStat'),
         ascendStat: document.getElementById('ascendStat'),
         descendStat: document.getElementById('descendStat'),
-        surfaceStatus: document.getElementById('surfaceStatus'),
         gpxBtn: document.getElementById('gpxBtn'),
         undoMapBtn: document.getElementById('undoMapBtn'),
         filterPanel: document.getElementById('filterPanel'),
@@ -724,6 +708,15 @@
       };
 
       const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6);
+
+      function positionUndoControl() {
+        if (window.innerWidth > 850) return;
+        const stack = document.querySelector('.leaflet-top.leaflet-left');
+        if (stack && els.undoMapBtn && els.undoMapBtn.parentElement !== stack) {
+          stack.appendChild(els.undoMapBtn);
+        }
+      }
+      setTimeout(positionUndoControl, 0);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors'
@@ -734,8 +727,7 @@
       state.currentLocationLayer.addTo(map);
 
       function setStatus(message, kind = '') {
-        els.surfaceStatus.textContent = message;
-        els.surfaceStatus.className = 'status' + (kind ? ' ' + kind : '');
+        // Le contrôle de sécurité reste actif, mais son message n'est plus affiché dans le résumé.
       }
 
       function setBusy(button, busy, label) {
@@ -918,7 +910,8 @@
         }, 450);
       }
 
-      map.on('click', (e) => addPoint(e.latlng));
+      // Les points de départ/arrivée se saisissent désormais uniquement par ville/adresse ou géolocalisation.
+      // Les clics sur la carte ne créent plus de points accidentels.
 
       async function apiJson(path, options = {}) {
         const res = await fetch(API_BASE + path, options);
@@ -1437,13 +1430,33 @@
         ];
       }
 
+      async function resolveABEndpoints() {
+        const startQuery = els.startSearch.value.trim();
+        const endQuery = els.endSearch.value.trim();
+        if (!startQuery) throw new Error('Saisissez une ville ou une adresse de départ.');
+        if (!endQuery) throw new Error('Saisissez une ville ou une adresse d’arrivée.');
+
+        setStatus('Recherche du départ et de l’arrivée…');
+        const start = startQuery === 'Ma position' && state.currentLocation
+          ? { lat: state.currentLocation.lat, lng: state.currentLocation.lng, label: 'Ma position' }
+          : await geocode(startQuery);
+        const end = await geocode(endQuery);
+
+        rememberWaypoints();
+        state.waypoints = [start, end];
+        refreshWaypointMarkers();
+        return cloneWaypoints(state.waypoints);
+      }
+
       async function generateABOptions({ silent = false } = {}) {
         if (state.mode !== 'ab') return false;
-        if (state.waypoints.length < 2) {
-          setStatus('Placez un départ et une arrivée.', 'warn');
+        let baseWaypoints;
+        try {
+          baseWaypoints = await resolveABEndpoints();
+        } catch (err) {
+          setStatus(err.message || 'Impossible de trouver le départ ou l’arrivée.', 'error');
           return false;
         }
-        const baseWaypoints = cloneWaypoints(state.waypoints);
         const serial = ++state.requestSerial;
         if (!silent) setBusy(els.calculateBtn, true, 'Recherche…');
         setStatus('Recherche de 3 itinéraires vélo de route…');
@@ -1537,7 +1550,7 @@
       }
 
       async function generateLoop() {
-        setBusy(els.generateLoopBtn, true, 'Création des 3 boucles…');
+        setBusy(els.generateLoopBtn, true, 'Création de la boucle…');
         const serial = ++state.requestSerial;
         try {
           clearRouteChoices();
@@ -1546,35 +1559,38 @@
 
           const targetKm = Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
           els.loopDistance.value = targetKm;
-          const targets = [
-            Math.max(10, targetKm * 0.80),
-            targetKm,
-            Math.min(350, targetKm * 1.20)
-          ];
-          const routes = [];
+          let route = null;
 
-          for (let variant = 0; variant < targets.length; variant++) {
-            let found = null;
-            for (let attempt = 0; attempt < 3 && !found; attempt++) {
-              const seed = state.loopSeed + variant * 5 + attempt;
-              const loopWaypoints = buildLoopWaypoints(start, targets[variant], seed);
-              setStatus(`Création des boucles… ${variant + 1}/3${attempt ? ` · tentative ${attempt + 1}` : ''}`);
-              try {
-                const route = await fetchSingleRoute(serial, { waypoints: loopWaypoints, loop: true });
-                route.waypoints = cloneWaypoints(loopWaypoints);
-                found = route;
-              } catch (_) {}
-            }
-            if (found) routes.push(found);
+          for (let attempt = 0; attempt < 5 && !route; attempt++) {
+            const seed = state.loopSeed + attempt * 7;
+            const loopWaypoints = buildLoopWaypoints(start, targetKm, seed);
+            setStatus(`Création de la boucle…${attempt ? ` tentative ${attempt + 1}` : ''}`);
+            try {
+              route = await fetchSingleRoute(serial, { waypoints: loopWaypoints, loop: true });
+              route.waypoints = cloneWaypoints(loopWaypoints);
+            } catch (_) {}
           }
 
           state.loopSeed += 17;
-          const chosen = chooseThreeByDistance(routes);
-          if (!chosen.length) throw new Error('Impossible de créer une boucle routable depuis ce départ. Essayez une autre distance ou une autre position.');
-          setRouteOptions(chosen);
-          if (chosen.length < 3) {
-            setStatus(`${chosen.length} boucle${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Le réseau local n’a pas permis 3 boucles distinctes.`, 'warn');
-          }
+          if (!route) throw new Error('Impossible de créer une boucle routable depuis ce départ. Essayez une autre distance ou une autre ville.');
+
+          state.routeOptions = [route];
+          state.selectedRouteOption = 0;
+          els.routeChoices.innerHTML = '';
+          els.routeChoices.classList.add('hidden');
+          state.waypoints = cloneWaypoints(route.waypoints || []);
+          refreshWaypointMarkers();
+          renderRoute(route);
+          setStatus('Boucle calculée. Vérification du revêtement…');
+          loadPoisNearRoute(serial).catch(() => {});
+          auditRoute(route, serial).catch((err) => {
+            if (serial === state.requestSerial) {
+              state.routeSafe = false;
+              els.gpxBtn.disabled = true;
+              setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Export GPX bloqué par précaution.`, 'error');
+            }
+          });
+          loadElevation(route, serial).catch(() => {});
           return true;
         } catch (err) {
           if (String(err.message).includes('remplacée')) return false;
@@ -1582,11 +1598,11 @@
             if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
             resetStats();
             clearRouteChoices();
-            setStatus(err.message || 'Impossible de créer les boucles.', 'error');
+            setStatus(err.message || 'Impossible de créer la boucle.', 'error');
           }
           return false;
         } finally {
-          setBusy(els.generateLoopBtn, false, 'Proposer 3 boucles');
+          setBusy(els.generateLoopBtn, false, 'Calculer la boucle');
         }
       }
 
@@ -1954,17 +1970,20 @@
         map.invalidateSize();
       });
 
-      // Sur mobile, ouvrir l'itinéraire au premier affichage pour guider l'utilisateur.
+      // Etat initial explicite : filtres fermes sur tous les appareils.
+      els.filterPanel.classList.add('collapsed');
+      els.filterToggleBtn.setAttribute('aria-expanded', 'false');
+      els.filterChevron.textContent = '+';
+
+      // Sur mobile, ouvrir l'itineraire au premier affichage pour guider l'utilisateur.
       if (window.innerWidth <= 850) {
+        positionUndoControl();
         document.body.classList.add('mobile-panel-open');
         setTimeout(() => map.invalidateSize(), 260);
       }
 
       els.modeAB.addEventListener('click', () => switchMode('ab'));
       els.modeLoop.addEventListener('click', () => switchMode('loop'));
-      els.startSearchBtn.addEventListener('click', () => placeFromSearch(els.startSearch, 'start'));
-      els.endSearchBtn.addEventListener('click', () => placeFromSearch(els.endSearch, 'end'));
-      els.loopSearchBtn.addEventListener('click', () => placeFromSearch(els.loopSearch, 'start'));
       els.useLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLocationBtn));
       els.useLoopLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLoopLocationBtn));
       els.calculateBtn.addEventListener('click', () => { closeMobilePanel(); generateABOptions(); });
@@ -1980,13 +1999,17 @@
       els.undoBtn.addEventListener('click', undoLastWaypointChange);
       els.undoMapBtn.addEventListener('click', undoLastWaypointChange);
       els.clearBtn.addEventListener('click', clearAll);
-      [els.startSearch, els.endSearch, els.loopSearch].forEach(input => {
+      [els.startSearch, els.endSearch].forEach(input => {
         input.addEventListener('keydown', e => {
           if (e.key !== 'Enter') return;
-          if (input === els.startSearch) placeFromSearch(input, 'start');
-          if (input === els.endSearch) placeFromSearch(input, 'end');
-          if (input === els.loopSearch) placeFromSearch(input, 'start');
+          closeMobilePanel();
+          generateABOptions();
         });
+      });
+      els.loopSearch.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        closeMobilePanel();
+        generateLoop();
       });
     })();
   </script>
