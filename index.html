@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <!-- RouteVelo V20 -->
+  <!-- RouteVelo V21 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
-  <meta name="routevelo-version" content="19" />
+  <meta name="routevelo-version" content="21" />
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <style>
@@ -1597,17 +1597,168 @@
         return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
       }
 
-      function buildLoopWaypoints(start, targetKm, seed) {
-        const orientation = (25 + seed * 67) % 360;
-        const radiusKm = targetKm / (4 * Math.SQRT2 * 1.12);
+      function buildLoopWaypoints(start, targetKm, seed, variant = 0) {
+        // Plusieurs formes (quadrilatère, pentagone, hexagone) et orientations.
+        // Le départ est un sommet du polygone : cela favorise deux branches
+        // différentes dès le début et évite les longues boucles « sucette ».
+        const sides = 4 + (variant % 3);
+        const orientation = (17 + seed * 47 + variant * 31) % 360;
+        const perimeterFactor = 2 * sides * Math.sin(Math.PI / sides);
+        const radiusKm = targetKm / (perimeterFactor * 1.12);
         const center = destinationPoint(start, radiusKm, orientation);
         const startAngle = initialBearing(center, start);
-        return [
-          { lat: start.lat, lng: start.lng },
-          destinationPoint(center, radiusKm, startAngle + 90),
-          destinationPoint(center, radiusKm, startAngle + 180),
-          destinationPoint(center, radiusKm, startAngle + 270)
-        ];
+        const points = [{ lat: start.lat, lng: start.lng }];
+        for (let i = 1; i < sides; i++) {
+          points.push(destinationPoint(center, radiusKm, startAngle + (360 / sides) * i));
+        }
+        return points;
+      }
+
+      function coordDistanceM(a, b) {
+        const lat0 = ((a[1] + b[1]) / 2) * Math.PI / 180;
+        const dx = (b[0] - a[0]) * 111320 * Math.max(0.15, Math.cos(lat0));
+        const dy = (b[1] - a[1]) * 110540;
+        return Math.hypot(dx, dy);
+      }
+
+      function segmentHeadingDeg(a, b) {
+        const lat0 = ((a[1] + b[1]) / 2) * Math.PI / 180;
+        const dx = (b[0] - a[0]) * Math.cos(lat0);
+        const dy = b[1] - a[1];
+        return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+      }
+
+      function headingDifference180(a, b) {
+        let d = Math.abs((a % 180) - (b % 180));
+        if (d > 90) d = 180 - d;
+        return d;
+      }
+
+      function sampleRouteSegments(coords, stepM = 70) {
+        const out = [];
+        let along = 0;
+        for (let i = 1; i < coords.length; i++) {
+          const a = coords[i - 1], b = coords[i];
+          const len = coordDistanceM(a, b);
+          if (!Number.isFinite(len) || len < 1) continue;
+          const pieces = Math.max(1, Math.ceil(len / stepM));
+          const partLen = len / pieces;
+          for (let j = 0; j < pieces; j++) {
+            const t0 = j / pieces, t1 = (j + 1) / pieces;
+            const p0 = [a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0];
+            const p1 = [a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1];
+            const mid = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2];
+            out.push({
+              mid,
+              len: partLen,
+              along: along + partLen / 2,
+              heading: segmentHeadingDeg(p0, p1)
+            });
+            along += partLen;
+          }
+        }
+        return out;
+      }
+
+      function measureLoopRetrace(route, start, targetKm) {
+        const samples = sampleRouteSegments(route.coords || [], 70);
+        if (!samples.length) return { repeatM: 0, longestRepeatM: 0, allowedStartM: 0 };
+
+        // Un petit tronçon commun est acceptable près du domicile/départ.
+        // Plus loin, les reprises du même axe sont fortement pénalisées.
+        const allowedStartM = Math.min(2200, Math.max(850, targetKm * 1000 * 0.025));
+        const minAlongGapM = Math.min(1600, Math.max(750, targetKm * 1000 * 0.012));
+        const refLat = start.lat * Math.PI / 180;
+        const kx = 111320 * Math.max(0.15, Math.cos(refLat));
+        const ky = 110540;
+        const gridM = 45;
+        const maxNearM = 38;
+        const buckets = new Map();
+        let repeatM = 0;
+        let longestRepeatM = 0;
+        let currentRunM = 0;
+        let gapInRunM = 0;
+        const startCoord = [start.lng, start.lat];
+
+        const bucketKey = (x, y) => `${x},${y}`;
+        const projected = coord => ({ x: coord[0] * kx, y: coord[1] * ky });
+
+        for (const sample of samples) {
+          const nearStart = coordDistanceM(sample.mid, startCoord) <= allowedStartM;
+          const p = projected(sample.mid);
+          const gx = Math.floor(p.x / gridM), gy = Math.floor(p.y / gridM);
+          let repeated = false;
+
+          if (!nearStart) {
+            outer:
+            for (let ox = -1; ox <= 1; ox++) {
+              for (let oy = -1; oy <= 1; oy++) {
+                const list = buckets.get(bucketKey(gx + ox, gy + oy));
+                if (!list) continue;
+                for (const prev of list) {
+                  if (sample.along - prev.along < minAlongGapM) continue;
+                  if (headingDifference180(sample.heading, prev.heading) > 28) continue;
+                  if (Math.hypot(p.x - prev.x, p.y - prev.y) > maxNearM) continue;
+                  repeated = true;
+                  break outer;
+                }
+              }
+            }
+          }
+
+          if (repeated) {
+            repeatM += sample.len;
+            currentRunM += gapInRunM + sample.len;
+            gapInRunM = 0;
+          } else if (currentRunM > 0) {
+            // Tolère un petit trou de détection pour ne pas couper artificiellement
+            // un aller-retour de plusieurs kilomètres en dizaines de petits bouts.
+            gapInRunM += sample.len;
+            if (gapInRunM > 180) {
+              longestRepeatM = Math.max(longestRepeatM, currentRunM);
+              currentRunM = 0;
+              gapInRunM = 0;
+            }
+          }
+
+          if (!nearStart) {
+            const key = bucketKey(gx, gy);
+            if (!buckets.has(key)) buckets.set(key, []);
+            const list = buckets.get(key);
+            list.push({ x: p.x, y: p.y, along: sample.along, heading: sample.heading });
+            if (list.length > 8) list.shift();
+          }
+        }
+        longestRepeatM = Math.max(longestRepeatM, currentRunM);
+        return { repeatM, longestRepeatM, allowedStartM };
+      }
+
+      function scoreLoopCandidate(route, start, targetKm) {
+        const retrace = measureLoopRetrace(route, start, targetKm);
+        const distanceErrorKm = Math.abs((route.distance || 0) / 1000 - targetKm);
+        const repeatKm = retrace.repeatM / 1000;
+        const longestRepeatKm = retrace.longestRepeatM / 1000;
+        const maxLongestM = Math.max(900, targetKm * 1000 * 0.018);
+        const maxTotalM = Math.max(1500, targetKm * 1000 * 0.035);
+        const acceptable = retrace.longestRepeatM <= maxLongestM && retrace.repeatM <= maxTotalM;
+        return {
+          ...retrace,
+          distanceErrorKm,
+          acceptable,
+          score: distanceErrorKm * 0.35 + repeatKm * 3.6 + longestRepeatKm * 6.2
+        };
+      }
+
+      function rankLoopCandidates(routes, start, targetKm) {
+        return distinctRoutes(routes)
+          .map(route => {
+            if (!route.loopQuality) route.loopQuality = scoreLoopCandidate(route, start, targetKm);
+            return route;
+          })
+          .sort((a, b) => {
+            if (a.loopQuality.acceptable !== b.loopQuality.acceptable) return a.loopQuality.acceptable ? -1 : 1;
+            return a.loopQuality.score - b.loopQuality.score;
+          });
       }
 
       async function resolveLoopStart() {
@@ -1646,31 +1797,45 @@
           const targetKm = Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
           els.loopDistance.value = targetKm;
           const candidates = [];
+          const maxAttempts = 16;
 
-          // Cherche plusieurs orientations autour de la même distance cible.
-          // On ne charge aucun POI tant que l'utilisateur n'a pas choisi sa boucle.
-          for (let attempt = 0; attempt < 12 && distinctRoutes(candidates).length < 3; attempt++) {
-            const seed = state.loopSeed + attempt * 7;
-            const loopWaypoints = buildLoopWaypoints(start, targetKm, seed);
-            setStatus(`Création des boucles… tentative ${attempt + 1}`);
+          // V21 : on génère volontairement plus de candidats puis on élimine
+          // les boucles qui reprennent le même axe loin du départ.
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const seed = state.loopSeed + attempt * 5;
+            const loopWaypoints = buildLoopWaypoints(start, targetKm, seed, attempt);
+            setStatus(`Recherche de boucles sans aller-retour… ${attempt + 1}/${maxAttempts}`);
             try {
               const route = await fetchSingleRoute(serial, { waypoints: loopWaypoints, loop: true });
               if (serial !== state.requestSerial) return false;
               route.waypoints = cloneWaypoints(loopWaypoints);
+              route.loopQuality = scoreLoopCandidate(route, start, targetKm);
               candidates.push(route);
+
+              // Dès que plusieurs bonnes solutions sont trouvées, inutile de
+              // continuer jusqu'à 16 requêtes. On garde néanmoins assez de
+              // candidats pour proposer trois boucles réellement différentes.
+              if (attempt >= 7) {
+                const rankedNow = rankLoopCandidates(candidates, start, targetKm);
+                const good = rankedNow.filter(r => r.loopQuality && r.loopQuality.acceptable);
+                if (good.length >= 4) break;
+              }
             } catch (_) {}
           }
 
-          state.loopSeed += 29;
-          const distinct = distinctRoutes(candidates);
-          if (!distinct.length) {
+          state.loopSeed += 37;
+          const ranked = rankLoopCandidates(candidates, start, targetKm);
+          if (!ranked.length) {
             throw new Error('Impossible de créer une boucle routable depuis ce départ. Essayez une autre distance ou une autre ville.');
           }
 
-          // Priorité aux boucles les plus proches de la distance demandée.
-          const chosen = distinct
-            .sort((a, b) => Math.abs(a.distance / 1000 - targetKm) - Math.abs(b.distance / 1000 - targetKm))
-            .slice(0, 3);
+          // Les reprises de route comptent bien plus que quelques kilomètres
+          // d'écart à la distance cible. Si trois boucles propres existent,
+          // elles passent toujours devant les boucles avec un long aller-retour.
+          const distanceToleranceKm = Math.max(3, targetKm * 0.15);
+          const closeToTarget = ranked.filter(route => route.loopQuality && route.loopQuality.distanceErrorKm <= distanceToleranceKm);
+          const selectionPool = closeToTarget.length >= 3 ? closeToTarget : ranked;
+          const chosen = selectionPool.slice(0, 3);
           chosen.forEach((route, index) => { route.label = `Boucle ${index + 1}`; });
 
           state.routeOptions = chosen;
@@ -1680,8 +1845,8 @@
           renderRouteChoices();
           renderLoopPreviews(chosen);
           setStatus(chosen.length >= 3
-            ? '3 boucles proposées : cliquez directement sur celle que vous préférez.'
-            : `${chosen.length} boucle${chosen.length > 1 ? 's' : ''} distincte${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Cliquez sur une boucle pour la sélectionner.`);
+            ? '3 boucles optimisées proposées : les longs aller-retours au milieu du parcours sont évités.'
+            : `${chosen.length} boucle${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Cliquez sur une boucle pour la sélectionner.`);
           return true;
         } catch (err) {
           if (String(err.message).includes('remplacée')) return false;
