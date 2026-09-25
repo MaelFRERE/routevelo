@@ -1,4 +1,4 @@
-# RouteVelo V24
+# RouteVelo V27
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -151,3 +151,11 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - affichage des altitudes min/max et de la distance du profil ;
 - le profil se met a jour automatiquement quand l'itineraire selectionne change ;
 - interface mobile adaptee avec un graphique plus compact.
+
+## V27 - Boucles strictes, points manuels et type de voie
+
+- Les boucles contenant une vraie portion en aller-retour sont rejetées, y compris près du départ au-delà d'une très courte marge technique.
+- Le générateur teste davantage d'orientations, mais évite une seconde calibration inutile quand une première boucle contient déjà un aller-retour.
+- Après avoir sélectionné un itinéraire, un clic sur la carte ajoute un point de passage à l'endroit logique du trajet et recalcule le tracé.
+- Un bouton **↶ Annuler le point** est placé sous les filtres pour revenir sur la dernière modification de point.
+- Sous le profil d'élévation, un bloc **Type de route** affiche en pourcentage la part de route, piste cyclable, voie de service et autres types de voie à partir du contrôle Valhalla.
