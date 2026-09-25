@@ -1,4 +1,4 @@
-# RouteVelo V16
+# RouteVelo V17
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -61,3 +61,11 @@ Les POI sont filtrés à 400 m maximum du tracé. Les cimetières sont indiqués
 ## V16
 - Le message de contrôle strict à côté des statistiques a été retiré de l’interface.
 - Le contrôle de sécurité des surfaces reste actif en arrière-plan et le GPX reste bloqué si nécessaire.
+
+
+## V17 - fiabilite des points de ravitaillement
+
+- Boulangeries : fusion Annuaire des Entreprises / SIRENE + OpenStreetMap.
+- Eau potable : fusion base nationale Huwise/OpenDataSoft + OpenStreetMap.
+- Si une source externe echoue, l autre peut toujours fournir des resultats.
+- Le filtre final reste limite a 400 m maximum du trace reel.

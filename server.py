@@ -538,6 +538,166 @@ def fetch_fast_cemeteries(route, radius):
     raise RuntimeError(f"Recherche rapide des cimetieres indisponible: {last_error}")
 
 
+
+def fetch_osm_route_pois(route, radius, kind):
+    """POI OSM rapides via petites bounding boxes le long du trace.
+
+    Utilise en secours/complement les donnees OSM sans envoyer un enorme
+    `around` contenant tout le parcours. Le filtrage exact a 400 m reste
+    effectue cote navigateur.
+    """
+    boxes = cemetery_search_boxes(route, padding_m=max(450, min(700, int(radius) + 80)), max_boxes=8)
+    if not boxes:
+        return []
+
+    clauses = []
+    for south, west, north, east in boxes:
+        bbox = f"({south:.6f},{west:.6f},{north:.6f},{east:.6f})"
+        if kind == "water":
+            clauses.extend([
+                f'nwr["amenity"="drinking_water"]{bbox};',
+                f'nwr["drinking_water"="yes"]{bbox};',
+            ])
+        elif kind == "bakery":
+            clauses.extend([
+                f'nwr["shop"="bakery"]{bbox};',
+            ])
+        else:
+            return []
+
+    query = "[out:json][timeout:7];(" + "".join(clauses) + ");out center tags qt;"
+    body = urllib.parse.urlencode({"data": query}).encode("utf-8")
+    last_error = None
+    for endpoint in _overpass_endpoints_ordered():
+        req = urllib.request.Request(
+            endpoint, data=body, method="POST",
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                "User-Agent": USER_AGENT,
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=9) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            elements = data.get("elements") if isinstance(data, dict) else None
+            if not isinstance(elements, list):
+                raise RuntimeError("Reponse Overpass invalide.")
+            return elements
+        except Exception as exc:
+            last_error = exc
+            continue
+    raise RuntimeError(f"POI OpenStreetMap indisponibles: {last_error}")
+
+
+def _osm_element_point(el):
+    try:
+        lat = float(el.get("lat", (el.get("center") or {}).get("lat")))
+        lng = float(el.get("lon", (el.get("center") or {}).get("lon")))
+    except Exception:
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+    return lat, lng
+
+
+def merge_water_sources(route, radius):
+    """Fusionne base nationale et OSM ; une panne d'une source ne donne plus 0."""
+    found = {}
+    errors = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        jobs = {
+            pool.submit(fetch_fast_drinking_water, route): "national",
+            pool.submit(fetch_osm_route_pois, route, radius, "water"): "osm",
+        }
+        for fut in concurrent.futures.as_completed(jobs):
+            source = jobs[fut]
+            try:
+                result = fut.result()
+            except Exception as exc:
+                errors.append((source, exc))
+                continue
+            if source == "national":
+                for item in result.get("waters", []) or []:
+                    try:
+                        lat, lng = float(item.get("lat")), float(item.get("lng"))
+                    except Exception:
+                        continue
+                    key = item.get("osm_id") or f"{lat:.5f},{lng:.5f}"
+                    found[str(key)] = item
+            else:
+                for el in result:
+                    pt = _osm_element_point(el)
+                    if not pt:
+                        continue
+                    lat, lng = pt
+                    tags = el.get("tags") or {}
+                    if tags.get("access") == "private" or tags.get("fee") == "yes":
+                        continue
+                    if not (tags.get("amenity") == "drinking_water" or tags.get("drinking_water") == "yes"):
+                        continue
+                    key = f"osm-{el.get('type','')}-{el.get('id','')}"
+                    found[key] = {
+                        "lat": lat, "lng": lng,
+                        "name": tags.get("name") or "Eau potable",
+                        "operator": tags.get("operator") or "",
+                        "description": tags.get("description") or "",
+                        "osm_id": str(el.get("id") or ""),
+                        "source": "OpenStreetMap / Overpass",
+                    }
+    if not found and len(errors) == 2:
+        raise RuntimeError("Sources d'eau potable indisponibles.")
+    return {"waters": list(found.values()), "source": "Base nationale + OpenStreetMap"}
+
+
+def merge_bakery_sources(route, radius):
+    """Fusionne SIRENE et OSM pour eviter les faux 0 boulangerie."""
+    found = {}
+    errors = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        jobs = {
+            pool.submit(fetch_official_bakeries, route): "sirene",
+            pool.submit(fetch_osm_route_pois, route, radius, "bakery"): "osm",
+        }
+        for fut in concurrent.futures.as_completed(jobs):
+            source = jobs[fut]
+            try:
+                result = fut.result()
+            except Exception as exc:
+                errors.append((source, exc))
+                continue
+            if source == "sirene":
+                for item in result.get("bakeries", []) or []:
+                    try:
+                        lat, lng = float(item.get("lat")), float(item.get("lng"))
+                    except Exception:
+                        continue
+                    key = item.get("siret") or f"sirene-{lat:.5f},{lng:.5f}"
+                    found[str(key)] = item
+            else:
+                for el in result:
+                    pt = _osm_element_point(el)
+                    if not pt:
+                        continue
+                    lat, lng = pt
+                    tags = el.get("tags") or {}
+                    if tags.get("shop") != "bakery":
+                        continue
+                    key = f"osm-{el.get('type','')}-{el.get('id','')}"
+                    address_parts = [
+                        tags.get("addr:housenumber", ""), tags.get("addr:street", ""),
+                        tags.get("addr:postcode", ""), tags.get("addr:city", "")
+                    ]
+                    found[key] = {
+                        "lat": lat, "lng": lng,
+                        "name": tags.get("name") or tags.get("brand") or "Boulangerie",
+                        "address": " ".join(x for x in address_parts if x).strip(),
+                        "siret": "", "naf": "",
+                        "source": "OpenStreetMap / Overpass",
+                    }
+    if not found and len(errors) == 2:
+        raise RuntimeError("Sources de boulangeries indisponibles.")
+    return {"bakeries": list(found.values()), "source": "SIRENE + OpenStreetMap"}
+
 def valid_bbox(value):
     if not isinstance(value, list) or len(value) != 4:
         return None
@@ -739,34 +899,33 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             if not route:
                 return self.send_error_json("Le trace est requis pour rechercher l'eau potable.", 400)
             cache_key = (
-                "fast-water",
+                "hybrid-water-v1",
                 tuple((round(lat, 4), round(lng, 4)) for lat, lng in route),
             )
             cached = _cache_get(cache_key)
             if cached is not None:
                 return self.send_json(cached)
             try:
-                data = fetch_fast_drinking_water(route)
+                data = merge_water_sources(route, radius)
                 _cache_put(cache_key, data)
                 return self.send_json(data)
             except RuntimeError as exc:
-                # Repli silencieux vers Overpass live si la base spécialisée est indisponible.
-                print(f"[water fallback] {exc}")
+                print(f"[water hybrid] {exc}")
 
         if kind == "bakery":
             if not route:
                 return self.send_error_json("Le trace est requis pour rechercher les boulangeries.", 400)
             cache_key = (
-                "business-bakery",
+                "hybrid-bakery-v1",
                 tuple((round(lat, 4), round(lng, 4)) for lat, lng in route),
             )
             cached = _cache_get(cache_key)
             if cached is not None:
                 return self.send_json(cached)
             try:
-                data = fetch_official_bakeries(route)
+                data = merge_bakery_sources(route, radius)
             except RuntimeError as exc:
-                return self.send_error_json(f"Annuaire des Entreprises indisponible: {exc}", 502)
+                return self.send_error_json(f"Boulangeries indisponibles: {exc}", 502)
             _cache_put(cache_key, data)
             return self.send_json(data)
 
