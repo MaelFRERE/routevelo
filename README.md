@@ -1,4 +1,4 @@
-# RouteVelo V21
+# RouteVelo V22
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -107,3 +107,12 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Les longs allers-retours au milieu du parcours sont fortement pénalisés et écartés lorsqu’une meilleure boucle existe.
 - Les formes de boucle varient entre quadrilatère, pentagone et hexagone afin de favoriser des branches aller/retour différentes.
 - Les 3 boucles sont toujours affichées avant le chargement des points d’eau et boulangeries.
+
+
+## V22 - boucles sans aller-retour au milieu
+
+- Filtre dur des reprises du meme axe hors de la zone depart/arrivee.
+- Jusqu a 24 orientations/formes testees pour trouver des boucles propres.
+- Les boucles avec plus de 120 m consecutifs ou 200 m cumules de route reprise hors du depart sont rejetees.
+- Si moins de 3 boucles propres existent, RouteVelo en affiche moins plutot que de proposer une mauvaise boucle.
+- Polygones de 5 a 8 sommets avec formes irregulieres pour mieux separer les branches.

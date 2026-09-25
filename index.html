@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <!-- RouteVelo V21 -->
+  <!-- RouteVelo V22 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
@@ -585,7 +585,7 @@
             <input id="loopDistance" type="number" min="10" max="350" step="5" value="80" />
             <button id="generateLoopBtn" class="btn btn-primary" type="button">Proposer 3 boucles</button>
           </div>
-          <div class="note">Une seule boucle est générée autour de la distance cible saisie.</div>
+          <div class="note">3 boucles sont recherchées en évitant les aller-retours hors de la zone de départ.</div>
         </div>
 
         <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer 3 itinéraires</button>
@@ -1598,18 +1598,24 @@
       }
 
       function buildLoopWaypoints(start, targetKm, seed, variant = 0) {
-        // Plusieurs formes (quadrilatère, pentagone, hexagone) et orientations.
-        // Le départ est un sommet du polygone : cela favorise deux branches
-        // différentes dès le début et évite les longues boucles « sucette ».
-        const sides = 4 + (variant % 3);
-        const orientation = (17 + seed * 47 + variant * 31) % 360;
+        // V22: formes plus contraintes et legerement irregulieres.
+        // Plus de sommets = moins de chances que le moteur revienne sur le meme axe.
+        const sides = 5 + (variant % 4);
+        const orientation = (11 + seed * 43 + variant * 29) % 360;
         const perimeterFactor = 2 * sides * Math.sin(Math.PI / sides);
-        const radiusKm = targetKm / (perimeterFactor * 1.12);
-        const center = destinationPoint(start, radiusKm, orientation);
+        const baseRadiusKm = targetKm / (perimeterFactor * 1.13);
+        const center = destinationPoint(start, baseRadiusKm, orientation);
         const startAngle = initialBearing(center, start);
+        const step = 360 / sides;
         const points = [{ lat: start.lat, lng: start.lng }];
+
         for (let i = 1; i < sides; i++) {
-          points.push(destinationPoint(center, radiusKm, startAngle + (360 / sides) * i));
+          // Pseudo-aleatoire deterministe, sans casser l'ordre des sommets.
+          const waveA = Math.sin((seed + 3) * 0.73 + i * 1.91 + variant * 0.41);
+          const waveB = Math.sin((seed + 7) * 1.17 + i * 2.37 + variant * 0.83);
+          const radialFactor = 0.86 + 0.16 * ((waveA + 1) / 2) + 0.10 * ((waveB + 1) / 2);
+          const angleJitter = waveB * step * 0.12;
+          points.push(destinationPoint(center, baseRadiusKm * radialFactor, startAngle + step * i + angleJitter));
         }
         return points;
       }
@@ -1661,23 +1667,26 @@
       }
 
       function measureLoopRetrace(route, start, targetKm) {
-        const samples = sampleRouteSegments(route.coords || [], 70);
-        if (!samples.length) return { repeatM: 0, longestRepeatM: 0, allowedStartM: 0 };
+        const samples = sampleRouteSegments(route.coords || [], 45);
+        if (!samples.length) return { repeatM: 0, longestRepeatM: 0, allowedStartM: 0, repeatRuns: 0 };
 
-        // Un petit tronçon commun est acceptable près du domicile/départ.
-        // Plus loin, les reprises du même axe sont fortement pénalisées.
-        const allowedStartM = Math.min(2200, Math.max(850, targetKm * 1000 * 0.025));
-        const minAlongGapM = Math.min(1600, Math.max(750, targetKm * 1000 * 0.012));
+        // Un troncon commun est tolere uniquement autour du point de depart/arrivee.
+        // Hors de cette zone, une reprise du meme axe est consideree comme un aller-retour.
+        const allowedStartM = Math.min(1600, Math.max(700, targetKm * 1000 * 0.020));
+        const minAlongGapM = Math.min(1200, Math.max(500, targetKm * 1000 * 0.008));
         const refLat = start.lat * Math.PI / 180;
         const kx = 111320 * Math.max(0.15, Math.cos(refLat));
         const ky = 110540;
-        const gridM = 45;
-        const maxNearM = 38;
+        const gridM = 35;
+        const maxNearM = 30;
+        const maxHeadingDiff = 22;
         const buckets = new Map();
         let repeatM = 0;
         let longestRepeatM = 0;
         let currentRunM = 0;
         let gapInRunM = 0;
+        let repeatRuns = 0;
+        let inRepeatRun = false;
         const startCoord = [start.lng, start.lat];
 
         const bucketKey = (x, y) => `${x},${y}`;
@@ -1697,7 +1706,7 @@
                 if (!list) continue;
                 for (const prev of list) {
                   if (sample.along - prev.along < minAlongGapM) continue;
-                  if (headingDifference180(sample.heading, prev.heading) > 28) continue;
+                  if (headingDifference180(sample.heading, prev.heading) > maxHeadingDiff) continue;
                   if (Math.hypot(p.x - prev.x, p.y - prev.y) > maxNearM) continue;
                   repeated = true;
                   break outer;
@@ -1707,18 +1716,24 @@
           }
 
           if (repeated) {
+            if (!inRepeatRun) {
+              repeatRuns += 1;
+              inRepeatRun = true;
+            }
             repeatM += sample.len;
             currentRunM += gapInRunM + sample.len;
             gapInRunM = 0;
           } else if (currentRunM > 0) {
-            // Tolère un petit trou de détection pour ne pas couper artificiellement
-            // un aller-retour de plusieurs kilomètres en dizaines de petits bouts.
+            // Petit trou tolere pour ne pas decouper un meme aller-retour en morceaux.
             gapInRunM += sample.len;
-            if (gapInRunM > 180) {
+            if (gapInRunM > 100) {
               longestRepeatM = Math.max(longestRepeatM, currentRunM);
               currentRunM = 0;
               gapInRunM = 0;
+              inRepeatRun = false;
             }
+          } else {
+            inRepeatRun = false;
           }
 
           if (!nearStart) {
@@ -1726,11 +1741,11 @@
             if (!buckets.has(key)) buckets.set(key, []);
             const list = buckets.get(key);
             list.push({ x: p.x, y: p.y, along: sample.along, heading: sample.heading });
-            if (list.length > 8) list.shift();
+            if (list.length > 12) list.shift();
           }
         }
         longestRepeatM = Math.max(longestRepeatM, currentRunM);
-        return { repeatM, longestRepeatM, allowedStartM };
+        return { repeatM, longestRepeatM, allowedStartM, repeatRuns };
       }
 
       function scoreLoopCandidate(route, start, targetKm) {
@@ -1738,14 +1753,17 @@
         const distanceErrorKm = Math.abs((route.distance || 0) / 1000 - targetKm);
         const repeatKm = retrace.repeatM / 1000;
         const longestRepeatKm = retrace.longestRepeatM / 1000;
-        const maxLongestM = Math.max(900, targetKm * 1000 * 0.018);
-        const maxTotalM = Math.max(1500, targetKm * 1000 * 0.035);
+
+        // V22: filtre dur. Hors de la zone depart/arrivee, on n'accepte
+        // que de tres petites reprises dues aux carrefours/arrondis GPS.
+        const maxLongestM = 120;
+        const maxTotalM = 200;
         const acceptable = retrace.longestRepeatM <= maxLongestM && retrace.repeatM <= maxTotalM;
         return {
           ...retrace,
           distanceErrorKm,
           acceptable,
-          score: distanceErrorKm * 0.35 + repeatKm * 3.6 + longestRepeatKm * 6.2
+          score: distanceErrorKm * 0.45 + repeatKm * 14 + longestRepeatKm * 22 + retrace.repeatRuns * 0.8
         };
       }
 
@@ -1797,10 +1815,10 @@
           const targetKm = Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
           els.loopDistance.value = targetKm;
           const candidates = [];
-          const maxAttempts = 16;
+          const maxAttempts = 24;
 
-          // V21 : on génère volontairement plus de candidats puis on élimine
-          // les boucles qui reprennent le même axe loin du départ.
+          // V22 : filtre dur des reprises de route loin du depart.
+          // On genere davantage de candidats plutot que de garder une boucle en aller-retour.
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const seed = state.loopSeed + attempt * 5;
             const loopWaypoints = buildLoopWaypoints(start, targetKm, seed, attempt);
@@ -1813,12 +1831,12 @@
               candidates.push(route);
 
               // Dès que plusieurs bonnes solutions sont trouvées, inutile de
-              // continuer jusqu'à 16 requêtes. On garde néanmoins assez de
+              // continuer jusqu'au nombre maximal de requetes. On garde néanmoins assez de
               // candidats pour proposer trois boucles réellement différentes.
-              if (attempt >= 7) {
+              if (attempt >= 10) {
                 const rankedNow = rankLoopCandidates(candidates, start, targetKm);
                 const good = rankedNow.filter(r => r.loopQuality && r.loopQuality.acceptable);
-                if (good.length >= 4) break;
+                if (good.length >= 6) break;
               }
             } catch (_) {}
           }
@@ -1829,12 +1847,16 @@
             throw new Error('Impossible de créer une boucle routable depuis ce départ. Essayez une autre distance ou une autre ville.');
           }
 
-          // Les reprises de route comptent bien plus que quelques kilomètres
-          // d'écart à la distance cible. Si trois boucles propres existent,
-          // elles passent toujours devant les boucles avec un long aller-retour.
-          const distanceToleranceKm = Math.max(3, targetKm * 0.15);
-          const closeToTarget = ranked.filter(route => route.loopQuality && route.loopQuality.distanceErrorKm <= distanceToleranceKm);
-          const selectionPool = closeToTarget.length >= 3 ? closeToTarget : ranked;
+          // V22: aucune boucle avec un aller-retour significatif au milieu
+          // n'est utilisee comme solution de secours. On prefere afficher moins
+          // de propositions plutot qu'une mauvaise boucle.
+          const clean = ranked.filter(route => route.loopQuality && route.loopQuality.acceptable);
+          if (!clean.length) {
+            throw new Error('Aucune boucle sans aller-retour significatif trouvée. Relancez pour essayer d’autres orientations ou ajustez légèrement la distance.');
+          }
+          const distanceToleranceKm = Math.max(4, targetKm * 0.18);
+          const cleanClose = clean.filter(route => route.loopQuality.distanceErrorKm <= distanceToleranceKm);
+          const selectionPool = cleanClose.length >= 3 ? cleanClose : clean;
           const chosen = selectionPool.slice(0, 3);
           chosen.forEach((route, index) => { route.label = `Boucle ${index + 1}`; });
 
@@ -1845,8 +1867,8 @@
           renderRouteChoices();
           renderLoopPreviews(chosen);
           setStatus(chosen.length >= 3
-            ? '3 boucles optimisées proposées : les longs aller-retours au milieu du parcours sont évités.'
-            : `${chosen.length} boucle${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Cliquez sur une boucle pour la sélectionner.`);
+            ? '3 boucles propres proposées : les reprises du même axe loin du départ ont été rejetées.'
+            : `${chosen.length} boucle${chosen.length > 1 ? 's' : ''} propre${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Les autres ont été rejetées car elles repassaient sur le même axe.`);
           return true;
         } catch (err) {
           if (String(err.message).includes('remplacée')) return false;
