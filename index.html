@@ -626,7 +626,7 @@
             <label class="switch"><input id="waterToggle" type="checkbox" checked /><span class="slider"></span></label>
           </div>
           <div class="toggle-row">
-            <div class="toggle-label"><span class="poi-symbol">🥐</span><span>Boulangeries<br><small>jusqu’à 400 m · registre entreprises France</small></span></div>
+            <div class="toggle-label"><span class="poi-symbol">🥐</span><span>Boulangeries<br><small>jusqu’à 400 m · Huwise/OSM + secours</small></span></div>
             <label class="switch"><input id="bakeryToggle" type="checkbox" checked /><span class="slider"></span></label>
           </div>
           <div class="poi-counts"><span id="waterCount" class="pill">0 point d’eau</span><span id="bakeryCount" class="pill">0 boulangerie</span></div>
@@ -1788,7 +1788,7 @@
         }).catch(err => {
           if (serial !== state.requestSerial) return;
           state.poiBakeryError = true;
-          console.warn('Boulangeries Annuaire des Entreprises:', err);
+          console.warn('Boulangeries:', err);
         }).finally(() => {
           if (serial === state.requestSerial) {
             state.poiLoadingBakery = false;

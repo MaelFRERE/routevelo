@@ -1,4 +1,4 @@
-# RouteVelo V17
+# RouteVelo V18
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -30,9 +30,9 @@ Quand `APP_PASSWORD` est défini, toutes les pages et toutes les API RouteVelo s
 
 - Routage : Valhalla public / OpenStreetMap.
 - Géocodage : Nominatim.
-- Eau potable : base spécialisée OpenDataSoft/Huwise avec repli OpenStreetMap.
-- Cimetières : OpenStreetMap/Overpass, recherche optimisée par petites zones.
-- Boulangeries : API Recherche d'entreprises / SIRENE.
+- Eau potable : Huwise/OpenDataSoft Explore API v2.1 avec repli OpenStreetMap.
+- Cimetières : OpenStreetMap/Overpass avec plusieurs instances publiques et requêtes compactes.
+- Boulangeries : Huwise/OpenDataSoft (commerces OSM) avec secours SIRENE puis Overpass.
 
 Les POI sont filtrés à 400 m maximum du tracé. Les cimetières sont indiqués comme **eau potentielle à vérifier**, et non comme eau potable confirmée.
 
@@ -69,3 +69,13 @@ Les POI sont filtrés à 400 m maximum du tracé. Les cimetières sont indiqués
 - Eau potable : fusion base nationale Huwise/OpenDataSoft + OpenStreetMap.
 - Si une source externe echoue, l autre peut toujours fournir des resultats.
 - Le filtre final reste limite a 400 m maximum du trace reel.
+
+
+## V18 - correction Render des POI
+
+- Remplacement de l'ancienne API Huwise/OpenDataSoft v1 par l'Explore API v2.1 actuelle.
+- Eau potable : requêtes géographiques v2.1 le long du tracé, sans clé API.
+- Boulangeries : dataset national Huwise `osm-france-shop-craft-office` filtré sur le type `bakery`, avec secours SIRENE/OSM.
+- Cimetières : requête Overpass allégée avec `nwr` et ajout d'une troisième instance publique de secours.
+- Nouvelles clés de cache pour éviter de réutiliser d'anciens résultats vides.
+- Le filtrage final reste strict à 400 m du tracé.
