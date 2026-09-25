@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
-  <meta name="routevelo-version" content="14" />
+  <meta name="routevelo-version" content="19" />
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <style>
@@ -622,7 +622,7 @@
         </button>
         <div id="filterBody" class="filter-body">
           <div class="toggle-row">
-            <div class="toggle-label"><span class="poi-symbol">💧</span><span>Eau potable + cimetières<br><small>jusqu’à 400 m · cimetières = eau à vérifier</small></span></div>
+            <div class="toggle-label"><span class="poi-symbol">💧</span><span>Points d’eau + cimetières<br><small>jusqu’à 400 m · potabilité indiquée au clic</small></span></div>
             <label class="switch"><input id="waterToggle" type="checkbox" checked /><span class="slider"></span></label>
           </div>
           <div class="toggle-row">
@@ -690,6 +690,7 @@
         currentLocationLayer: L.layerGroup(),
         currentLocation: null,
         routeCoords: [],
+        routeDistanceCoords: [],
         routeEncoded: '',
         routeSafe: false,
         routeOptions: [],
@@ -764,6 +765,7 @@
         els.gpxBtn.disabled = true;
         state.routeSafe = false;
         state.routeCoords = [];
+        state.routeDistanceCoords = [];
         state.routeEncoded = '';
       }
 
@@ -1184,6 +1186,7 @@
 
       function renderRoute(route) {
         state.routeCoords = route.coords;
+        state.routeDistanceCoords = simplifyRouteDouglasPeucker(route.coords, 12);
         state.routeEncoded = route.encoded;
         state.routeSafe = false;
         els.gpxBtn.disabled = true;
@@ -1670,14 +1673,17 @@
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
             const p = { lat, lng };
             if (distanceToRouteM(p) > MAX_POI_DISTANCE_M) continue;
+            const potable = item.potable !== false;
             water.push({
               lat,
               lng,
-              name: item.name || 'Eau potable',
+              name: item.name || (potable ? 'Eau potable' : 'Point d’eau'),
               operator: item.operator || '',
               description: item.description || '',
-              source: item.source || data.source || 'Huwise / OpenDataSoft',
+              source: item.source || data.source || 'Source ouverte',
               osmUrl: item.osm_url || '',
+              waterKind: item.water_kind || '',
+              potable,
               tags: {}
             });
           }
@@ -1689,10 +1695,21 @@
             const tags = el.tags || {};
             const p = { lat, lng };
             if (distanceToRouteM(p) > MAX_POI_DISTANCE_M) continue;
-            const waterTagged = tags.amenity === 'drinking_water' || tags.drinking_water === 'yes';
-            if (waterTagged && tags.access !== 'private' && tags.fee !== 'yes') {
-              water.push({ lat, lng, name: tags.name || 'Eau potable', tags, source: 'OpenStreetMap / Overpass' });
-            }
+            if (tags.access === 'private' || tags.fee === 'yes' || tags.drinking_water === 'no') continue;
+            const confirmed = tags.amenity === 'drinking_water' || ['yes', 'treated'].includes(tags.drinking_water);
+            const potential = tags.amenity === 'water_point';
+            if (!confirmed && !potential) continue;
+            water.push({
+              lat,
+              lng,
+              name: tags.name || (confirmed ? 'Eau potable' : 'Point d’eau'),
+              operator: tags.operator || '',
+              description: tags.description || (confirmed ? '' : 'Potabilité à vérifier sur place.'),
+              source: 'OpenStreetMap / Overpass',
+              potable: confirmed,
+              waterKind: potential && !confirmed ? 'water_point' : 'drinking_water',
+              tags
+            });
           }
         }
         state.pois.water = dedupePois(water);
@@ -1731,7 +1748,7 @@
           if (distanceToRouteM(p) > MAX_POI_DISTANCE_M) continue;
           const cemeteryTagged = tags.landuse === 'cemetery' || tags.amenity === 'grave_yard';
           if (cemeteryTagged && tags.access !== 'private') {
-            cemetery.push({ lat, lng, name: tags.name || 'Cimetière', tags, potentialWater: true });
+            cemetery.push({ lat, lng, name: tags.name || 'Cimetière', tags, source: tags.source || data.source || '', potentialWater: true });
           }
         }
         state.pois.cemetery = dedupePois(cemetery);
@@ -1831,7 +1848,7 @@
 
       function poiIcon(type) {
         const symbol = type === 'water' ? '💧' : (type === 'cemetery' ? '💧' : '🥐');
-        const label = type === 'water' ? 'Eau potable' : (type === 'cemetery' ? 'Eau potentielle (cimetière)' : 'Boulangerie');
+        const label = type === 'water' ? 'Point d’eau' : (type === 'cemetery' ? 'Eau potentielle (cimetière)' : 'Boulangerie');
         return L.divIcon({
           className: 'poi-leaflet-icon',
           html: `<div class="poi-map-icon ${type}" role="img" aria-label="${label}">${symbol}</div>`,
@@ -1849,13 +1866,16 @@
           state.pois.water.forEach(p => {
             const operator = p.operator ? `<br><small>${escapeHtml(p.operator)}</small>` : '';
             const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
+            const description = p.description ? `<br><small>${escapeHtml(p.description)}</small>` : '';
+            const quality = p.potable === false ? 'Point d’eau potentiel · potabilité à vérifier' : 'Eau potable confirmée';
             L.marker([p.lat, p.lng], { icon: poiIcon('water'), keyboard: true })
-              .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>Eau potable${operator}${source}`)
+              .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${quality}${operator}${description}${source}`)
               .addTo(state.poiLayers.water);
           });
           state.pois.cemetery.forEach(p => {
+            const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
             L.marker([p.lat, p.lng], { icon: poiIcon('cemetery'), keyboard: true })
-              .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>Cimetière : point d’eau potentiel.<br><small>La présence et la potabilité de l’eau ne sont pas garanties.</small>`)
+              .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>Cimetière : point d’eau potentiel.<br><small>La présence et la potabilité de l’eau ne sont pas garanties.</small>${source}`)
               .addTo(state.poiLayers.cemetery);
           });
         }
@@ -1884,28 +1904,30 @@
           els.bakeryCount.textContent = `${bc} boulangerie${bc > 1 ? 's' : ''}`;
         }
 
+        const waterLabel = `${wc} point${wc > 1 ? 's' : ''} d’eau`;
         if (state.poiWaterError && state.poiCemeteryError) {
           els.waterCount.textContent = 'Points d’eau indisponibles';
         } else if (state.poiLoadingWater) {
           els.waterCount.textContent = 'Recherche eau…';
         } else if (state.poiLoadingCemetery) {
-          els.waterCount.textContent = `${wc} eau · cimetières…`;
+          els.waterCount.textContent = `${waterLabel} · cimetières…`;
         } else if (state.poiCemeteryError) {
-          els.waterCount.textContent = `${wc} eau · cimetières indisponibles`;
+          els.waterCount.textContent = `${waterLabel} · cimetières indisponibles`;
         } else {
-          els.waterCount.textContent = `${wc} eau · ${cc} cimetière${cc > 1 ? 's' : ''}`;
+          els.waterCount.textContent = `${waterLabel} · ${cc} cimetière${cc > 1 ? 's' : ''}`;
         }
       }
 
       function distanceToRouteM(p) {
-        if (!state.routeCoords.length) return Infinity;
+        const coords = state.routeDistanceCoords.length ? state.routeDistanceCoords : state.routeCoords;
+        if (!coords.length) return Infinity;
+        if (coords.length === 1) return haversineM(p, { lat: coords[0][1], lng: coords[0][0] });
+        const point = [Number(p.lng), Number(p.lat)];
         let min = Infinity;
-        const step = Math.max(1, Math.floor(state.routeCoords.length / 1800));
-        for (let i = 0; i < state.routeCoords.length; i += step) {
-          const c = state.routeCoords[i];
-          const d = haversineM(p, { lat: c[1], lng: c[0] });
+        for (let i = 0; i < coords.length - 1; i++) {
+          const d = pointToSegmentDistanceM(point, coords[i], coords[i + 1]);
           if (d < min) min = d;
-          if (min < 35) return min;
+          if (min < 20) return min;
         }
         return min;
       }
@@ -1933,7 +1955,11 @@
         const track = state.routeCoords.map(c => `    <trkpt lat="${c[1]}" lon="${c[0]}"></trkpt>`).join('\n');
         const poiWpts = [];
         if (els.waterToggle.checked) {
-          state.pois.water.forEach(p => poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)}</name><type>Eau potable</type></wpt>`));
+          state.pois.water.forEach(p => {
+            const type = p.potable === false ? 'Eau potentielle' : 'Eau potable';
+            const desc = p.potable === false ? '<desc>Potabilité à vérifier sur place.</desc>' : '';
+            poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)}</name>${desc}<type>${type}</type></wpt>`);
+          });
           state.pois.cemetery.forEach(p => poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)} — eau potentielle</name><desc>Cimetière : présence et potabilité de l’eau à vérifier sur place.</desc><type>Eau potentielle - cimetière</type></wpt>`));
         }
         if (els.bakeryToggle.checked) state.pois.bakery.forEach(p => poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)}</name><type>Boulangerie</type></wpt>`));

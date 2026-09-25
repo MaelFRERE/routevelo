@@ -1,4 +1,4 @@
-# RouteVelo V18
+# RouteVelo V19
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -30,11 +30,11 @@ Quand `APP_PASSWORD` est défini, toutes les pages et toutes les API RouteVelo s
 
 - Routage : Valhalla public / OpenStreetMap.
 - Géocodage : Nominatim.
-- Eau potable : Huwise/OpenDataSoft Explore API v2.1 avec repli OpenStreetMap.
-- Cimetières : OpenStreetMap/Overpass avec plusieurs instances publiques et requêtes compactes.
-- Boulangeries : Huwise/OpenDataSoft (commerces OSM) avec secours SIRENE puis Overpass.
+- Points d’eau confirmés : Huwise/OpenDataSoft (données OSM).
+- Points d’eau potentiels et cimetières : IGN BD TOPO via le géocodeur Géoplateforme, avec secours OpenStreetMap/Overpass.
+- Boulangeries : fusion Huwise/OpenStreetMap + Annuaire des Entreprises / SIRENE.
 
-Les POI sont filtrés à 400 m maximum du tracé. Les cimetières sont indiqués comme **eau potentielle à vérifier**, et non comme eau potable confirmée.
+Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lavoir ou un cimetière provenant de la BD TOPO est indiqué comme **eau potentielle à vérifier** : l’application ne prétend pas que cette eau est potable.
 
 
 ## V12 — mobile
@@ -79,3 +79,13 @@ Les POI sont filtrés à 400 m maximum du tracé. Les cimetières sont indiqués
 - Cimetières : requête Overpass allégée avec `nwr` et ajout d'une troisième instance publique de secours.
 - Nouvelles clés de cache pour éviter de réutiliser d'anciens résultats vides.
 - Le filtrage final reste strict à 400 m du tracé.
+
+
+## V19 - couverture continue et fusion réelle des sources
+
+- Correction du filtre à 400 m : la distance est désormais calculée jusqu’aux **segments du tracé**, et non seulement jusqu’à quelques sommets de la ligne.
+- Boulangeries : Huwise et SIRENE sont toujours fusionnés. Les codes NAF `10.71C` et `47.24Z` sont interrogés séparément pour éviter qu’un filtre multi-valeurs soit mal interprété.
+- Eau : fusion des points potables OSM/Huwise avec les fontaines, points d’eau, sources captées et lavoirs de la BD TOPO.
+- Cimetières : IGN BD TOPO devient la source principale ; Overpass n’est plus que le secours.
+- Les recherches IGN utilisent des cercles chevauchants tout le long du parcours afin de ne plus laisser de trous entre deux zones de recherche.
+- Cache POI versionné à nouveau pour ne pas réutiliser les résultats incomplets des versions précédentes.

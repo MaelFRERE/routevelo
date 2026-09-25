@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
+import unicodedata
 import hmac
 import hashlib
 import html
@@ -30,6 +32,7 @@ AUTH_COOKIE = "routevelo_auth"
 VALHALLA = "https://valhalla1.openstreetmap.de"
 NOMINATIM = "https://nominatim.openstreetmap.org"
 BUSINESS_API = "https://recherche-entreprises.api.gouv.fr"
+IGN_GEOCODER = "https://data.geopf.fr/geocodage"
 WATER_DATASET = "osm-france-drinking-water"
 HUWISE_DATASETS = {
     "water": "osm-france-drinking-water",
@@ -446,18 +449,27 @@ def _pick_business_name(company, establishment):
 
 
 def fetch_official_bakeries(route):
-    """Boulangeries actives via l'Annuaire des Entreprises / SIRENE, sans cle API."""
-    allowed_naf = {"10.71C", "47.24Z"}
+    """Boulangeries actives via l'Annuaire des Entreprises / SIRENE, sans cle API.
+
+    Les deux codes NAF sont interroges separement: certaines versions de l'API
+    n'interpretent pas une valeur separee par virgule comme un OU pour ce filtre.
+    """
+    allowed_naf = ("10.71C", "47.24Z")
     found = {}
-    for lat, lng in business_anchors(route, spacing_km=8.0):
+    errors = []
+    anchors = business_anchors(route, spacing_km=7.0)
+
+    def query_anchor_naf(anchor, naf):
+        lat, lng = anchor
+        rows = []
         page = 1
         max_pages = 1
         while page <= max_pages and page <= 2:
             params = {
                 "lat": f"{lat:.6f}",
                 "long": f"{lng:.6f}",
-                "radius": "5",
-                "activite_principale": "10.71C,47.24Z",
+                "radius": "4.2",
+                "activite_principale": naf,
                 "etat_administratif": "A",
                 "minimal": "true",
                 "include": "matching_etablissements",
@@ -467,26 +479,37 @@ def fetch_official_bakeries(route):
             }
             business_gate.wait()
             url = BUSINESS_API + "/near_point?" + urllib.parse.urlencode(params)
-            data, _ = upstream_json(url, headers={"User-Agent": USER_AGENT}, timeout=15)
+            data, _ = upstream_json(url, headers={"User-Agent": USER_AGENT}, timeout=12)
             try:
                 max_pages = min(2, max(1, int(data.get("total_pages", 1))))
             except Exception:
                 max_pages = 1
-            for company in data.get("results", []) or []:
+            rows.extend(data.get("results", []) or [])
+            page += 1
+        return rows
+
+    tasks = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+        for anchor in anchors:
+            for naf in allowed_naf:
+                tasks.append(pool.submit(query_anchor_naf, anchor, naf))
+        for fut in concurrent.futures.as_completed(tasks):
+            try:
+                companies = fut.result()
+            except Exception as exc:
+                errors.append(exc)
+                continue
+            for company in companies:
                 if not isinstance(company, dict):
                     continue
-                establishments = []
                 matching = company.get("matching_etablissements") or []
-                if isinstance(matching, list):
-                    establishments.extend(x for x in matching if isinstance(x, dict))
-                siege = company.get("siege")
-                if isinstance(siege, dict):
-                    establishments.append(siege)
-                for est in establishments:
-                    if est.get("etat_administratif") not in (None, "A"):
+                if not isinstance(matching, list):
+                    continue
+                for est in matching:
+                    if not isinstance(est, dict) or est.get("etat_administratif") not in (None, "A"):
                         continue
                     naf = est.get("activite_principale") or company.get("activite_principale")
-                    if naf and naf not in allowed_naf:
+                    if naf not in allowed_naf:
                         continue
                     try:
                         blat = float(est.get("latitude"))
@@ -512,9 +535,239 @@ def fetch_official_bakeries(route):
                         "naf": naf or "",
                         "source": "Annuaire des Entreprises / SIRENE",
                     }
-            page += 1
+    if not found and errors and len(errors) == len(tasks):
+        raise RuntimeError(str(errors[0]))
     return {"bakeries": list(found.values()), "source": "Annuaire des Entreprises / SIRENE"}
 
+
+
+def _clean_label(value):
+    text = str(value or "").strip().casefold()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+
+
+def _distance_m(a, b):
+    return haversine_km((float(a["lat"]), float(a["lng"])), (float(b["lat"]), float(b["lng"]))) * 1000.0
+
+
+def _dedupe_businesses(items, max_distance_m=65):
+    """Fusionne les doublons SIRENE/OSM sans fusionner deux commerces distincts proches."""
+    out = []
+    by_id = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        stable_id = str(item.get("siret") or item.get("osm_id") or item.get("id") or "").strip()
+        if stable_id and stable_id in by_id:
+            existing = by_id[stable_id]
+            for k in ("address", "siret", "naf", "osm_id"):
+                if not existing.get(k) and item.get(k):
+                    existing[k] = item[k]
+            continue
+        name = _clean_label(item.get("name"))
+        duplicate = None
+        for existing in out:
+            try:
+                if _distance_m(item, existing) > max_distance_m:
+                    continue
+            except Exception:
+                continue
+            other = _clean_label(existing.get("name"))
+            generic = {"", "boulangerie", "boulangerie patisserie", "bakery"}
+            try:
+                distance = _distance_m(item, existing)
+            except Exception:
+                continue
+            if name in generic or other in generic:
+                same_name = distance <= 20
+            elif name == other:
+                same_name = distance <= max_distance_m
+            else:
+                same_name = bool(name and other and (name in other or other in name) and distance <= 45)
+            if same_name:
+                duplicate = existing
+                break
+        if duplicate is not None:
+            for k in ("address", "siret", "naf", "osm_id"):
+                if not duplicate.get(k) and item.get(k):
+                    duplicate[k] = item[k]
+            sources = [x for x in str(duplicate.get("source") or "").split(" + ") if x]
+            src = str(item.get("source") or "").strip()
+            if src and src not in sources:
+                duplicate["source"] = " + ".join(sources + [src])
+            continue
+        out.append(dict(item))
+        if stable_id:
+            by_id[stable_id] = out[-1]
+    return out
+
+
+def _dedupe_water_items(items, max_distance_m=30):
+    """Déduplique les points d'eau; une source confirmée prime sur une source potentielle."""
+    out = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        duplicate = None
+        for existing in out:
+            try:
+                if _distance_m(item, existing) <= max_distance_m:
+                    duplicate = existing
+                    break
+            except Exception:
+                continue
+        if duplicate is None:
+            out.append(dict(item))
+            continue
+        old_confirmed = duplicate.get("potable") is not False
+        new_confirmed = item.get("potable") is not False
+        if new_confirmed and not old_confirmed:
+            keep = dict(item)
+            if not keep.get("description") and duplicate.get("description"):
+                keep["description"] = duplicate["description"]
+            out[out.index(duplicate)] = keep
+        else:
+            src = str(item.get("source") or "").strip()
+            if src and src not in str(duplicate.get("source") or ""):
+                duplicate["source"] = " + ".join(x for x in [duplicate.get("source", ""), src] if x)
+    return out
+
+
+def fetch_ign_route_pois(route, categories, radius_m=1800, spacing_km=3.0, limit=50):
+    """POI BD TOPO via le geocodeur IGN, public et sans cle.
+
+    Chaque categorie est interrogee separement sur des cercles chevauchants.
+    Cela evite qu'une API/instance interprete mal un filtre multi-categories et
+    assure une couverture continue du trajet. Le navigateur garde ensuite
+    uniquement les points situes a 400 m du trace exact.
+    """
+    anchors = business_anchors(route, spacing_km=spacing_km)
+    if not anchors:
+        return []
+    if isinstance(categories, (list, tuple, set)):
+        category_values = [str(x).strip() for x in categories if str(x).strip()]
+    else:
+        category_values = [str(categories).strip()]
+    found = {}
+    errors = []
+
+    def one(anchor, category):
+        lat, lng = anchor
+        searchgeom = json.dumps({
+            "type": "Circle",
+            "coordinates": [round(lng, 7), round(lat, 7)],
+            "radius": int(radius_m),
+        }, separators=(",", ":"), ensure_ascii=False)
+        params = {
+            "index": "poi",
+            "searchgeom": searchgeom,
+            "lon": f"{lng:.7f}",
+            "lat": f"{lat:.7f}",
+            "limit": str(max(1, min(50, int(limit)))),
+            "category": category,
+        }
+        url = IGN_GEOCODER + "/reverse?" + urllib.parse.urlencode(params)
+        data, _ = upstream_json(url, headers={"User-Agent": USER_AGENT}, timeout=8)
+        features = data.get("features") if isinstance(data, dict) else None
+        if not isinstance(features, list):
+            raise RuntimeError("Reponse IGN POI invalide.")
+        return features
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(one, anchor, category) for anchor in anchors for category in category_values]
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                features = fut.result()
+            except Exception as exc:
+                errors.append(exc)
+                continue
+            for feature in features:
+                if not isinstance(feature, dict):
+                    continue
+                geometry = feature.get("geometry") or {}
+                coords = geometry.get("coordinates") if isinstance(geometry, dict) else None
+                if not isinstance(coords, (list, tuple)) or len(coords) < 2:
+                    continue
+                try:
+                    lng, lat = float(coords[0]), float(coords[1])
+                except Exception:
+                    continue
+                if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                    continue
+                props = feature.get("properties") or {}
+                if not isinstance(props, dict):
+                    props = {}
+                cats = props.get("category") or []
+                if isinstance(cats, str):
+                    cats = [cats]
+                name = props.get("toponym")
+                if not name:
+                    names = props.get("name") or []
+                    if isinstance(names, list) and names:
+                        name = names[0]
+                    elif isinstance(names, str):
+                        name = names
+                extra = props.get("extrafields") or {}
+                cleabs = str(extra.get("cleabs") or "") if isinstance(extra, dict) else ""
+                key = cleabs or f"ign-{lat:.5f}-{lng:.5f}-{_clean_label(name)}"
+                found[key] = {
+                    "id": key,
+                    "lat": lat,
+                    "lng": lng,
+                    "name": str(name or "Point d'interet").strip(),
+                    "categories": [str(x) for x in cats],
+                    "city": ", ".join(str(x) for x in (props.get("city") or []) if x) if isinstance(props.get("city"), list) else str(props.get("city") or ""),
+                    "source": "IGN BD TOPO / Geoplateforme",
+                }
+    if not found and errors and len(errors) == len(futures):
+        raise RuntimeError(str(errors[0]))
+    return list(found.values())
+
+
+def fetch_ign_cemeteries(route):
+    items = fetch_ign_route_pois(route, ["cimetière"], radius_m=1850, spacing_km=3.0, limit=50)
+    elements = []
+    for item in items:
+        elements.append({
+            "type": "node",
+            "id": item.get("id"),
+            "lat": item["lat"],
+            "lon": item["lng"],
+            "tags": {
+                "landuse": "cemetery",
+                "name": item.get("name") or "Cimetière",
+                "source": item.get("source") or "IGN BD TOPO / Géoplateforme",
+            },
+        })
+    return {"elements": elements, "source": "IGN BD TOPO / Géoplateforme"}
+
+
+def fetch_ign_water_candidates(route):
+    # Ces objets ne garantissent pas la potabilité. Ils sont affichés comme eau potentielle.
+    items = fetch_ign_route_pois(
+        route,
+        ["fontaine", "point d'eau", "source captée", "lavoir"],
+        radius_m=1850,
+        spacing_km=3.0,
+        limit=50,
+    )
+    out = []
+    for item in items:
+        cats = [str(x).casefold() for x in item.get("categories") or []]
+        detail = next((x for x in ("fontaine", "point d'eau", "source captée", "lavoir") if x in cats), "point d'eau")
+        out.append({
+            "lat": item["lat"],
+            "lng": item["lng"],
+            "name": item.get("name") or detail.capitalize(),
+            "operator": "",
+            "description": f"{detail.capitalize()} : potabilité à vérifier sur place.",
+            "source": item.get("source") or "IGN BD TOPO / Géoplateforme",
+            "potable": False,
+            "water_kind": detail,
+        })
+    return out
 
 def cemetery_search_boxes(route, padding_m=700, max_boxes=8):
     """Construit quelques petites bounding boxes le long du trace.
@@ -636,7 +889,8 @@ def fetch_osm_route_pois(route, radius, kind):
         if kind == "water":
             clauses.extend([
                 f'nwr["amenity"="drinking_water"]{bbox};',
-                f'nwr["drinking_water"="yes"]{bbox};',
+                f'nwr["amenity"="water_point"]{bbox};',
+                f'nwr["drinking_water"~"^(yes|treated)$"]{bbox};',
             ])
         elif kind == "bakery":
             clauses.extend([
@@ -681,98 +935,143 @@ def _osm_element_point(el):
 
 
 def merge_water_sources(route, radius):
-    """Source principale Huwise v2.1, puis OpenStreetMap live uniquement en secours."""
+    """Fusionne eau confirmée OSM/Huwise et points d'eau potentiels IGN."""
     errors = []
-    try:
-        primary = fetch_fast_drinking_water(route)
-        if primary.get("waters"):
-            return primary
-    except Exception as exc:
-        errors.append(exc)
+    waters = []
 
-    # Secours OSM live si la base precalculee ne renvoie rien ou echoue.
-    found = {}
-    try:
-        for el in fetch_osm_route_pois(route, radius, "water"):
-            pt = _osm_element_point(el)
-            if not pt:
-                continue
-            lat, lng = pt
-            tags = el.get("tags") or {}
-            if tags.get("access") == "private" or tags.get("fee") == "yes":
-                continue
-            if not (tags.get("amenity") == "drinking_water" or tags.get("drinking_water") in {"yes", "treated"}):
-                continue
-            key = f"osm-{el.get('type','')}-{el.get('id','')}"
-            found[key] = {
-                "lat": lat,
-                "lng": lng,
-                "name": tags.get("name") or "Eau potable",
-                "operator": tags.get("operator") or "",
-                "description": tags.get("description") or "",
-                "osm_id": str(el.get("id") or ""),
-                "source": "OpenStreetMap / Overpass",
-            }
-    except Exception as exc:
-        errors.append(exc)
+    # Les deux services stables sont interrogés en parallèle.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        futures = {
+            pool.submit(fetch_fast_drinking_water, route): "huwise",
+            pool.submit(fetch_ign_water_candidates, route): "ign",
+        }
+        for fut, label in list(futures.items()):
+            try:
+                data = fut.result()
+                if label == "huwise":
+                    for item in data.get("waters", []) or []:
+                        entry = dict(item)
+                        entry["potable"] = True
+                        waters.append(entry)
+                else:
+                    waters.extend(data or [])
+            except Exception as exc:
+                errors.append(exc)
 
-    if found:
-        return {"waters": list(found.values()), "source": "OpenStreetMap / Overpass (secours)"}
+    # Si Huwise ne fournit aucun point confirme, Overpass tente de completer les
+    # points potables OSM, meme si l'IGN a deja trouve des fontaines potentielles.
+    if not any(item.get("potable") is not False for item in waters):
+        try:
+            for el in fetch_osm_route_pois(route, radius, "water"):
+                pt = _osm_element_point(el)
+                if not pt:
+                    continue
+                lat, lng = pt
+                tags = el.get("tags") or {}
+                if tags.get("access") == "private" or tags.get("fee") == "yes" or tags.get("drinking_water") == "no":
+                    continue
+                confirmed = tags.get("amenity") == "drinking_water" or tags.get("drinking_water") in {"yes", "treated"}
+                potential = tags.get("amenity") == "water_point"
+                if not (confirmed or potential):
+                    continue
+                waters.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "name": tags.get("name") or ("Eau potable" if confirmed else "Point d'eau"),
+                    "operator": tags.get("operator") or "",
+                    "description": tags.get("description") or ("" if confirmed else "Potabilité à vérifier sur place."),
+                    "osm_id": str(el.get("id") or ""),
+                    "source": "OpenStreetMap / Overpass",
+                    "potable": bool(confirmed),
+                    "water_kind": "water_point" if potential and not confirmed else "drinking_water",
+                })
+        except Exception as exc:
+            errors.append(exc)
+
+    waters = _dedupe_water_items(waters)
+    if waters:
+        return {"waters": waters, "source": "Huwise + IGN BD TOPO + OpenStreetMap"}
     if errors:
-        raise RuntimeError(" ; ".join(str(e) for e in errors[:2]))
-    return {"waters": [], "source": "Huwise + OpenStreetMap"}
+        raise RuntimeError(" ; ".join(str(e) for e in errors[:3]))
+    return {"waters": [], "source": "Huwise + IGN BD TOPO + OpenStreetMap"}
 
 
 def merge_bakery_sources(route, radius):
-    """Huwise OSM en principal; SIRENE puis Overpass en secours si besoin."""
+    """Fusionne systématiquement Huwise OSM + SIRENE au lieu de s'arrêter à la première source."""
     errors = []
-    try:
-        primary = fetch_huwise_bakeries(route)
-        if primary.get("bakeries"):
-            return primary
-    except Exception as exc:
-        errors.append(exc)
+    bakeries = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(fetch_huwise_bakeries, route),
+            pool.submit(fetch_official_bakeries, route),
+        ]
+        for fut in futures:
+            try:
+                data = fut.result()
+                bakeries.extend(data.get("bakeries", []) or [])
+            except Exception as exc:
+                errors.append(exc)
 
-    # Le registre entreprises complete les commerces absents d'OSM.
-    try:
-        official = fetch_official_bakeries(route)
-        if official.get("bakeries"):
-            return official
-    except Exception as exc:
-        errors.append(exc)
+    # Overpass uniquement en secours si les deux sources principales sont vides.
+    if not bakeries:
+        try:
+            for el in fetch_osm_route_pois(route, radius, "bakery"):
+                pt = _osm_element_point(el)
+                if not pt:
+                    continue
+                lat, lng = pt
+                tags = el.get("tags") or {}
+                if tags.get("shop") != "bakery":
+                    continue
+                address_parts = [
+                    tags.get("addr:housenumber", ""), tags.get("addr:street", ""),
+                    tags.get("addr:postcode", ""), tags.get("addr:city", "")
+                ]
+                bakeries.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "name": tags.get("name") or tags.get("brand") or "Boulangerie",
+                    "address": " ".join(x for x in address_parts if x).strip(),
+                    "siret": "",
+                    "naf": "",
+                    "osm_id": str(el.get("id") or ""),
+                    "source": "OpenStreetMap / Overpass",
+                })
+        except Exception as exc:
+            errors.append(exc)
 
-    found = {}
-    try:
-        for el in fetch_osm_route_pois(route, radius, "bakery"):
-            pt = _osm_element_point(el)
-            if not pt:
-                continue
-            lat, lng = pt
-            tags = el.get("tags") or {}
-            if tags.get("shop") != "bakery":
-                continue
-            key = f"osm-{el.get('type','')}-{el.get('id','')}"
-            address_parts = [
-                tags.get("addr:housenumber", ""), tags.get("addr:street", ""),
-                tags.get("addr:postcode", ""), tags.get("addr:city", "")
-            ]
-            found[key] = {
-                "lat": lat,
-                "lng": lng,
-                "name": tags.get("name") or tags.get("brand") or "Boulangerie",
-                "address": " ".join(x for x in address_parts if x).strip(),
-                "siret": "",
-                "naf": "",
-                "source": "OpenStreetMap / Overpass",
-            }
-    except Exception as exc:
-        errors.append(exc)
-
-    if found:
-        return {"bakeries": list(found.values()), "source": "OpenStreetMap / Overpass (secours)"}
+    bakeries = _dedupe_businesses(bakeries)
+    if bakeries:
+        return {"bakeries": bakeries, "source": "Huwise OSM + Annuaire des Entreprises / SIRENE"}
     if errors:
         raise RuntimeError(" ; ".join(str(e) for e in errors[:3]))
     return {"bakeries": [], "source": "Huwise + SIRENE + OpenStreetMap"}
+
+
+def merge_cemetery_sources(route, radius):
+    """IGN BD TOPO en source principale; Overpass seulement en secours."""
+    errors = []
+    ign_ok = False
+    try:
+        ign = fetch_ign_cemeteries(route)
+        ign_ok = True
+        if ign.get("elements"):
+            return ign
+    except Exception as exc:
+        errors.append(exc)
+    try:
+        osm = fetch_fast_cemeteries(route, radius)
+        if osm.get("elements"):
+            return osm
+    except Exception as exc:
+        errors.append(exc)
+    # Si IGN a repondu correctement mais sans resultat, une panne du serveur de
+    # secours ne doit pas transformer un resultat vide en « indisponible ».
+    if ign_ok:
+        return {"elements": [], "source": "IGN BD TOPO / Geoplateforme"}
+    if errors:
+        raise RuntimeError(" ; ".join(str(e) for e in errors[:2]))
+    return {"elements": [], "source": "IGN BD TOPO + OpenStreetMap"}
 
 
 def valid_bbox(value):
@@ -792,7 +1091,7 @@ def valid_bbox(value):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "RouteVelo/1.1"
+    server_version = "RouteVelo/1.9"
 
     def _auth_token(self):
         return hmac.new(AUTH_SECRET.encode("utf-8"), b"routevelo-auth-v1", hashlib.sha256).hexdigest()
@@ -875,7 +1174,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/health":
-            return self.send_json({"status": "ok"})
+            return self.send_json({"status": "ok", "version": "19"})
         if parsed.path == "/login":
             if self._is_authenticated():
                 return self._redirect("/")
@@ -976,7 +1275,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             if not route:
                 return self.send_error_json("Le trace est requis pour rechercher l'eau potable.", 400)
             cache_key = (
-                "huwise-water-v2",
+                "water-hybrid-v19b",
                 tuple((round(lat, 4), round(lng, 4)) for lat, lng in route),
             )
             cached = _cache_get(cache_key)
@@ -993,7 +1292,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             if not route:
                 return self.send_error_json("Le trace est requis pour rechercher les boulangeries.", 400)
             cache_key = (
-                "huwise-bakery-v2",
+                "bakery-hybrid-v19b",
                 tuple((round(lat, 4), round(lng, 4)) for lat, lng in route),
             )
             cached = _cache_get(cache_key)
@@ -1011,14 +1310,14 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             if not route:
                 return self.send_error_json("Le trace est requis pour rechercher les cimetieres.", 400)
             cache_key = (
-                "fast-cemetery-v3", radius,
+                "cemetery-ign-v19b", radius,
                 tuple((round(lat, 4), round(lng, 4)) for lat, lng in route),
             )
             cached = _cache_get(cache_key)
             if cached is not None:
                 return self.send_json(cached)
             try:
-                data = fetch_fast_cemeteries(route, radius)
+                data = merge_cemetery_sources(route, radius)
             except RuntimeError as exc:
                 print(f"[cemetery] {exc}")
                 return self.send_error_json(str(exc), 502)
