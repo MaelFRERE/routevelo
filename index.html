@@ -1,29 +1,32 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <!-- RouteVelo V23 -->
+  <!-- RouteVelo V25 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
-  <meta name="routevelo-version" content="21" />
-  <link rel="preconnect" href="https://unpkg.com" />
+  <meta name="theme-color" content="#7c3aed" />
+  <meta name="routevelo-version" content="25" />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f7f7;
+      --bg: #faf7ff;
       --panel: #ffffff;
-      --text: #162421;
-      --muted: #63736f;
-      --line: #dce5e2;
-      --accent: #126b58;
-      --accent-2: #0b4e41;
-      --soft: #eaf4f1;
-      --warn: #946300;
-      --warn-bg: #fff7df;
-      --danger: #9e2e2e;
-      --danger-bg: #fff0f0;
-      --shadow: 0 14px 34px rgba(24, 56, 49, .10);
+      --text: #261d31;
+      --muted: #746a80;
+      --line: #ebe4f2;
+      --accent: #7c3aed;
+      --accent-2: #5b21b6;
+      --pink: #db2777;
+      --soft: #f4efff;
+      --warn: #8a5b12;
+      --warn-bg: #fff8e7;
+      --danger: #a72f55;
+      --danger-bg: #fff0f6;
+      --shadow: 0 12px 30px rgba(76, 29, 149, .10);
     }
 
     * { box-sizing: border-box; }
@@ -67,7 +70,7 @@
       place-items: center;
       font-size: 23px;
       background: var(--soft);
-      border: 1px solid #cde2dc;
+      border: 1px solid #eadcff;
     }
 
     h1 { margin: 0; font-size: 20px; }
@@ -97,8 +100,8 @@
     }
 
     input:focus, select:focus {
-      border-color: #7db5a8;
-      box-shadow: 0 0 0 3px rgba(18, 107, 88, .10);
+      border-color: #a78bfa;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, .12);
     }
 
     .btn {
@@ -111,10 +114,10 @@
       font-weight: 700;
     }
 
-    .btn:hover:not(:disabled) { background: #f8fbfa; }
+    .btn:hover:not(:disabled) { background: #fbf8ff; }
     .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
     .btn-primary:hover:not(:disabled) { background: var(--accent-2); }
-    .btn-soft { background: var(--soft); border-color: #cfe2dd; color: var(--accent-2); }
+    .btn-soft { background: var(--soft); border-color: #e5d6ff; color: var(--accent-2); }
     .btn-danger { color: var(--danger); }
     .full { width: 100%; }
 
@@ -123,7 +126,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 6px;
       padding: 4px;
-      background: #f1f5f4;
+      background: #f4f0f8;
       border-radius: 13px;
     }
 
@@ -135,7 +138,7 @@
       color: var(--muted);
       font-weight: 750;
     }
-    .segmented button.active { background: white; color: var(--text); box-shadow: 0 2px 8px rgba(20,50,43,.08); }
+    .segmented button.active { background: white; color: var(--text); box-shadow: 0 2px 8px rgba(76,29,149,.08); }
 
     .toggle-row {
       display: flex;
@@ -165,7 +168,7 @@
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 10px 11px;
-      background: #fbfcfc;
+      background: #fdfbff;
     }
     .stat strong { display: block; font-size: 18px; }
     .stat span { color: var(--muted); font-size: 11px; }
@@ -175,16 +178,16 @@
       padding: 10px 12px;
       font-size: 12px;
       line-height: 1.45;
-      background: #f3f7f6;
+      background: #f7f3fb;
       border: 1px solid var(--line);
       color: var(--muted);
     }
-    .status.ok { background: var(--soft); border-color: #cfe2dd; color: var(--accent-2); }
+    .status.ok { background: var(--soft); border-color: #e5d6ff; color: var(--accent-2); }
     .status.warn { background: var(--warn-bg); border-color: #ecd8a1; color: var(--warn); }
     .status.error { background: var(--danger-bg); border-color: #efc5c5; color: var(--danger); }
 
     .poi-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .pill { font-size: 11px; padding: 5px 8px; border-radius: 999px; background: #f2f5f4; border: 1px solid var(--line); }
+    .pill { font-size: 11px; padding: 5px 8px; border-radius: 999px; background: #f6f2fa; border: 1px solid var(--line); }
 
     .map-wrap { position: relative; min-width: 0; }
     #map { width: 100%; height: 100vh; }
@@ -213,7 +216,7 @@
     }
     .legend span { display: inline-flex; align-items: center; gap: 5px; }
     .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-    .dot.route { background: #126b58; }
+    .dot.route { background: #7c3aed; }
     .dot.water { background: #2879c9; }
     .dot.bakery { background: #c77817; }
     .dot.position { background: #2866d7; box-shadow: 0 0 0 3px rgba(40,102,215,.18); }
@@ -265,16 +268,16 @@
       border: 1px solid var(--line);
       border-radius: 11px;
       padding: 8px 10px;
-      background: #f8faf9;
+      background: #fbf8ff;
       color: var(--text);
       text-align: left;
       transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
     }
-    .route-choice:hover { background: #f3f8f6; }
+    .route-choice:hover { background: #f7f1ff; }
     .route-choice.active {
-      border-color: #7db5a8;
+      border-color: #a78bfa;
       background: var(--soft);
-      box-shadow: 0 0 0 2px rgba(18,107,88,.08);
+      box-shadow: 0 0 0 2px rgba(124,58,237,.10);
     }
     .route-choice-title { display: block; font-size: 12px; font-weight: 850; }
     .route-choice-meta { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -298,7 +301,7 @@
       min-width: 0;
       padding: 7px 9px;
       border-radius: 10px;
-      background: #f7faf9;
+      background: #fbf8ff;
       border: 1px solid var(--line);
     }
     .summary-stat strong { display: block; font-size: 16px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -343,7 +346,7 @@
       color: var(--text);
       text-align: left;
     }
-    .filter-panel-head:hover { background: #f8fbfa; }
+    .filter-panel-head:hover { background: #fbf8ff; }
     .filter-panel-head span:first-child { min-width: 0; }
     .filter-panel-head strong { display: block; font-size: 13px; }
     .filter-panel-head small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -408,7 +411,7 @@
         overflow-y: auto;
         border-right: 1px solid var(--line);
         border-bottom: 0;
-        box-shadow: 16px 0 45px rgba(24,56,49,.16);
+        box-shadow: 16px 0 45px rgba(76,29,149,.14);
         transform: translateX(-105%);
         transition: transform .22s ease;
       }
@@ -418,7 +421,7 @@
         position: fixed;
         z-index: 1250;
         inset: 0;
-        background: rgba(10,25,22,.30);
+        background: rgba(38,20,55,.28);
         opacity: 0;
         pointer-events: none;
         transition: opacity .2s ease;
@@ -541,6 +544,45 @@
       .map-summary-actions { display: block; }
       .gpx-map-btn { width: 100%; }
     }
+
+    /* V25 — DA rose/violet sobre + moins d'effets couteux a peindre. */
+    h1 { letter-spacing: -.025em; }
+    .brand-mark {
+      background: linear-gradient(145deg, #f5edff, #fff0f8);
+      border-color: #eadcff;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.8);
+    }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 5px 14px rgba(124,58,237,.14);
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-2); }
+    .btn-soft { background: #f7f2ff; border-color: #e7d9ff; color: var(--accent-2); }
+    .segmented button.active { box-shadow: 0 2px 10px rgba(91,33,182,.08); }
+    .route-choice.active { border-color: #c4a6ff; background: #f7f1ff; box-shadow: 0 0 0 2px rgba(124,58,237,.08); }
+    .map-summary, .filter-panel, .mobile-menu-btn {
+      background: rgba(255,255,255,.985);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      contain: layout paint;
+    }
+    .sidebar { scrollbar-width: thin; scrollbar-color: #d9c9f4 transparent; }
+    .filter-chevron { background: #f3edff; color: var(--accent); }
+    .leaflet-control-zoom a { color: var(--accent-2); }
+    .leaflet-bar { border: 1px solid #e5dbef !important; box-shadow: 0 4px 14px rgba(76,29,149,.10) !important; }
+    .leaflet-bar a { border-bottom-color: #eee7f5 !important; }
+    .leaflet-control-attribution { background: rgba(255,255,255,.88) !important; }
+    .loop-preview-marker { box-shadow: 0 3px 12px rgba(76,29,149,.18); }
+
+    @media (max-width: 850px) {
+      .sidebar { will-change: transform; }
+      .map-summary, .filter-panel, .mobile-menu-btn { box-shadow: 0 8px 24px rgba(76,29,149,.10); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
   </style>
 </head>
 <body>
@@ -550,7 +592,7 @@
         <div class="brand-mark">🚴</div>
         <div>
           <h1>RouteVelo</h1>
-          <div class="subtitle">Planificateur strict pour vélo de route</div>
+          <div class="subtitle">Itinéraires vélo de route</div>
         </div>
         <button id="mobileCloseBtn" class="mobile-close-btn" type="button" aria-label="Fermer les réglages">×</button>
       </div>
@@ -566,7 +608,7 @@
           <label for="startSearch">Départ</label>
           <input id="startSearch" type="text" placeholder="Ville ou adresse" />
           <div class="location-row">
-            <button id="useLocationBtn" class="btn btn-soft full" type="button">⌖ Utiliser ma position comme départ</button>
+            <button id="useLocationBtn" class="btn btn-soft full" type="button">⌖ Ma position comme départ</button>
             <div class="location-help">Le navigateur demandera l’autorisation d’utiliser la localisation de ce PC.</div>
           </div>
           <label for="endSearch">Arrivée</label>
@@ -577,7 +619,7 @@
           <label for="loopSearch">Point de départ de la boucle</label>
           <input id="loopSearch" type="text" placeholder="Ville ou adresse" />
           <div class="location-row">
-            <button id="useLoopLocationBtn" class="btn btn-soft full" type="button">⌖ Démarrer la boucle depuis ma position</button>
+            <button id="useLoopLocationBtn" class="btn btn-soft full" type="button">⌖ Boucle depuis ma position</button>
             <div class="location-help">La précision dépend du GPS, du Wi‑Fi et des services de localisation disponibles sur le PC.</div>
           </div>
           <label for="loopDistance">Distance moyenne cible</label>
@@ -710,12 +752,13 @@
         poiWaterError: false,
         poiBakeryError: false,
         poiCemeteryError: false,
+        poiCache: new Map(),
         loopSeed: 0,
         recalcTimer: null,
         requestSerial: 0
       };
 
-      const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6);
+      const map = L.map('map', { zoomControl: true, preferCanvas: true, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([46.6, 2.5], 6);
 
       function positionUndoControl() {
         if (window.innerWidth > 850) return;
@@ -727,6 +770,9 @@
       setTimeout(positionUndoControl, 0);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
+        updateWhenIdle: true,
+        updateWhenZooming: false,
+        keepBuffer: 2,
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
       state.poiLayers.water.addTo(map);
@@ -796,7 +842,7 @@
       function markerIcon(i) {
         return L.divIcon({
           className: '',
-          html: `<div style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#126b58;color:white;border:3px solid white;box-shadow:0 2px 9px rgba(0,0,0,.28);font:800 13px system-ui">${i + 1}</div>`,
+          html: `<div style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#7c3aed;color:white;border:3px solid white;box-shadow:0 2px 9px rgba(0,0,0,.28);font:800 13px system-ui">${i + 1}</div>`,
           iconSize: [30, 30], iconAnchor: [15, 15]
         });
       }
@@ -1035,12 +1081,12 @@
         setStatus('Recherche de votre position… Autorisez la localisation si le navigateur le demande.');
         navigator.geolocation.getCurrentPosition(
           pos => {
-            setBusy(button, false, button === els.useLoopLocationBtn ? '⌖ Démarrer la boucle depuis ma position' : '⌖ Utiliser ma position comme départ');
+            setBusy(button, false, button === els.useLoopLocationBtn ? '⌖ Boucle depuis ma position' : '⌖ Ma position comme départ');
             const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             applyCurrentLocationAsStart(p, pos.coords.accuracy);
           },
           err => {
-            setBusy(button, false, button === els.useLoopLocationBtn ? '⌖ Démarrer la boucle depuis ma position' : '⌖ Utiliser ma position comme départ');
+            setBusy(button, false, button === els.useLoopLocationBtn ? '⌖ Boucle depuis ma position' : '⌖ Ma position comme départ');
             setStatus(geolocationErrorMessage(err), 'error');
           },
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
@@ -1206,7 +1252,8 @@
         state.routeSafe = false;
         els.gpxBtn.disabled = true;
         if (state.routeLayer) map.removeLayer(state.routeLayer);
-        const latlngs = route.coords.map(c => [c[1], c[0]]);
+        const displayCoords = simplifyRouteDouglasPeucker(route.coords, window.innerWidth <= 850 ? 12 : 8);
+        const latlngs = displayCoords.map(c => [c[1], c[0]]);
         const routeOutline = L.polyline(latlngs, {
           color: '#ffffff',
           weight: 10,
@@ -1216,7 +1263,7 @@
           interactive: false
         });
         const routeMain = L.polyline(latlngs, {
-          color: '#126b58',
+          color: '#7c3aed',
           weight: 6,
           opacity: 1,
           lineJoin: 'round',
@@ -1250,10 +1297,11 @@
         updatePoiCounts();
         resetStats();
 
-        const colors = ['#126b58', '#2879c9', '#c77817'];
+        const colors = ['#7c3aed', '#db2777', '#4f46e5'];
         const layers = [];
         routes.forEach((route, index) => {
-          const latlngs = route.coords.map(c => [c[1], c[0]]);
+          const previewCoords = simplifyRouteDouglasPeucker(route.coords, window.innerWidth <= 850 ? 22 : 14);
+          const latlngs = previewCoords.map(c => [c[1], c[0]]);
           if (!latlngs.length) return;
           const outline = L.polyline(latlngs, {
             color: '#ffffff', weight: 11, opacity: .9,
@@ -1861,9 +1909,9 @@
           const targetKm = Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
           els.loopDistance.value = targetKm;
           const candidates = [];
-          const maxAttempts = 10;
+          const maxAttempts = 8;
 
-          // V24 : generation calibree. On prefere trois boucles propres et proches de la cible, mais on ne
+          // V25 : generation calibree et arret anticipe pour reduire le temps d’attente. On prefere trois boucles propres et proches de la cible, mais on ne
           // laisse plus le filtre anti-aller-retour empecher completement l'affichage.
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const seed = state.loopSeed + attempt * 5;
@@ -1877,7 +1925,7 @@
               candidates.push(route);
 
               // Des que trois solutions excellentes ou tres bonnes existent, on les affiche.
-              if (attempt >= 5) {
+              if (attempt >= 4) {
                 const rankedNow = rankLoopCandidates(candidates, start, targetKm);
                 const good = rankedNow.filter(r => r.loopQuality && r.loopQuality.qualityTier <= 1);
                 const nearTarget = good.filter(r => r.loopQuality.distanceErrorKm <= Math.max(2, targetKm * 0.04));
@@ -2091,6 +2139,23 @@
 
       async function loadPoisNearRoute(serial) {
         if (!state.routeCoords.length) return;
+
+        const cacheKey = state.routeEncoded || `${state.routeCoords.length}:${state.routeCoords[0]?.join(',')}:${state.routeCoords.at(-1)?.join(',')}`;
+        const cached = state.poiCache.get(cacheKey);
+        if (cached) {
+          state.pois.water = cached.water.map(p => ({ ...p }));
+          state.pois.cemetery = cached.cemetery.map(p => ({ ...p }));
+          state.pois.bakery = cached.bakery.map(p => ({ ...p }));
+          state.poiLoadingWater = false;
+          state.poiLoadingBakery = false;
+          state.poiLoadingCemetery = false;
+          state.poiWaterError = false;
+          state.poiBakeryError = false;
+          state.poiCemeteryError = false;
+          renderPois();
+          return;
+        }
+
         state.poiLayers.water.clearLayers();
         state.poiLayers.cemetery.clearLayers();
         state.poiLayers.bakery.clearLayers();
@@ -2116,7 +2181,7 @@
           if (serial !== state.requestSerial) return;
           parseWaterPois(data);
           state.poiWaterError = false;
-          renderPois();
+          renderPois('water');
         }).catch(err => {
           if (serial !== state.requestSerial) return;
           state.poiWaterError = true;
@@ -2136,7 +2201,7 @@
           if (serial !== state.requestSerial) return;
           parseBakeryPois(data);
           state.poiBakeryError = false;
-          renderPois();
+          renderPois('bakery');
         }).catch(err => {
           if (serial !== state.requestSerial) return;
           state.poiBakeryError = true;
@@ -2156,7 +2221,7 @@
           if (serial !== state.requestSerial) return;
           parseCemeteryPois(data);
           state.poiCemeteryError = false;
-          renderPois();
+          renderPois('water');
         }).catch(err => {
           if (serial !== state.requestSerial) return;
           state.poiCemeteryError = true;
@@ -2169,6 +2234,14 @@
         });
 
         await Promise.allSettled([waterTask, bakeryTask, cemeteryTask]);
+        if (serial === state.requestSerial && cacheKey) {
+          state.poiCache.set(cacheKey, {
+            water: state.pois.water.map(p => ({ ...p })),
+            cemetery: state.pois.cemetery.map(p => ({ ...p })),
+            bakery: state.pois.bakery.map(p => ({ ...p }))
+          });
+          while (state.poiCache.size > 6) state.poiCache.delete(state.poiCache.keys().next().value);
+        }
       }
 
       function dedupePois(items) {
@@ -2193,35 +2266,39 @@
         });
       }
 
-      function renderPois() {
-        state.poiLayers.water.clearLayers();
-        state.poiLayers.cemetery.clearLayers();
-        state.poiLayers.bakery.clearLayers();
-        if (els.waterToggle.checked) {
-          state.pois.water.forEach(p => {
-            const operator = p.operator ? `<br><small>${escapeHtml(p.operator)}</small>` : '';
-            const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
-            const description = p.description ? `<br><small>${escapeHtml(p.description)}</small>` : '';
-            const quality = p.potable === false ? 'Point d’eau potentiel · potabilité à vérifier' : 'Eau potable confirmée';
-            L.marker([p.lat, p.lng], { icon: poiIcon('water'), keyboard: true })
-              .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${quality}${operator}${description}${source}`)
-              .addTo(state.poiLayers.water);
-          });
-          state.pois.cemetery.forEach(p => {
-            const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
-            L.marker([p.lat, p.lng], { icon: poiIcon('cemetery'), keyboard: true })
-              .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>Cimetière : point d’eau potentiel.<br><small>La présence et la potabilité de l’eau ne sont pas garanties.</small>${source}`)
-              .addTo(state.poiLayers.cemetery);
-          });
+      function renderPois(kind = 'all') {
+        if (kind === 'all' || kind === 'water') {
+          state.poiLayers.water.clearLayers();
+          state.poiLayers.cemetery.clearLayers();
+          if (els.waterToggle.checked) {
+            state.pois.water.forEach(p => {
+              const operator = p.operator ? `<br><small>${escapeHtml(p.operator)}</small>` : '';
+              const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
+              const description = p.description ? `<br><small>${escapeHtml(p.description)}</small>` : '';
+              const quality = p.potable === false ? 'Point d’eau potentiel · potabilité à vérifier' : 'Eau potable confirmée';
+              L.marker([p.lat, p.lng], { icon: poiIcon('water'), keyboard: false })
+                .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${quality}${operator}${description}${source}`)
+                .addTo(state.poiLayers.water);
+            });
+            state.pois.cemetery.forEach(p => {
+              const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
+              L.marker([p.lat, p.lng], { icon: poiIcon('cemetery'), keyboard: false })
+                .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>Cimetière : point d’eau potentiel.<br><small>La présence et la potabilité de l’eau ne sont pas garanties.</small>${source}`)
+                .addTo(state.poiLayers.cemetery);
+            });
+          }
         }
-        if (els.bakeryToggle.checked) {
-          state.pois.bakery.forEach(p => {
-            const address = p.address ? `<br><small>${escapeHtml(p.address)}</small>` : '';
-            const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
-            L.marker([p.lat, p.lng], { icon: poiIcon('bakery'), keyboard: true })
-              .bindPopup(`<strong>${escapeHtml(p.name)}</strong>${address}${source}`)
-              .addTo(state.poiLayers.bakery);
-          });
+        if (kind === 'all' || kind === 'bakery') {
+          state.poiLayers.bakery.clearLayers();
+          if (els.bakeryToggle.checked) {
+            state.pois.bakery.forEach(p => {
+              const address = p.address ? `<br><small>${escapeHtml(p.address)}</small>` : '';
+              const source = p.source ? `<br><small>Source : ${escapeHtml(p.source)}</small>` : '';
+              L.marker([p.lat, p.lng], { icon: poiIcon('bakery'), keyboard: false })
+                .bindPopup(`<strong>${escapeHtml(p.name)}</strong>${address}${source}`)
+                .addTo(state.poiLayers.bakery);
+            });
+          }
         }
         updatePoiCounts();
       }
@@ -2354,8 +2431,8 @@
         els.filterToggleBtn.setAttribute('aria-expanded', String(!collapsed));
         els.filterChevron.textContent = collapsed ? '+' : '−';
       });
-      els.waterToggle.addEventListener('change', renderPois);
-      els.bakeryToggle.addEventListener('change', renderPois);
+      els.waterToggle.addEventListener('change', () => renderPois('all'));
+      els.bakeryToggle.addEventListener('change', () => renderPois('all'));
       els.gpxBtn.addEventListener('click', downloadGpx);
       els.undoBtn.addEventListener('click', undoLastWaypointChange);
       els.undoMapBtn.addEventListener('click', undoLastWaypointChange);

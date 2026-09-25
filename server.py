@@ -10,6 +10,7 @@ import re
 import unicodedata
 import hmac
 import hashlib
+import gzip
 import html
 import concurrent.futures
 import mimetypes
@@ -165,10 +166,18 @@ def _cache_get(key):
 
 def _cache_put(key, data):
     with poi_cache_lock:
-        if len(poi_cache) > 100:
+        if len(poi_cache) > 160:
             oldest = min(poi_cache.items(), key=lambda kv: kv[1][0])[0]
             poi_cache.pop(oldest, None)
         poi_cache[key] = (time.monotonic(), data)
+
+
+def _payload_cache_key(prefix, payload):
+    try:
+        normalized = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    except Exception:
+        return None
+    return (prefix, hashlib.sha256(normalized.encode("utf-8")).hexdigest())
 
 def _overpass_endpoints_ordered():
     global overpass_pick_index
@@ -1091,7 +1100,7 @@ def valid_bbox(value):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "RouteVelo/1.9"
+    server_version = "RouteVelo/2.5"
 
     def _auth_token(self):
         return hmac.new(AUTH_SECRET.encode("utf-8"), b"routevelo-auth-v1", hashlib.sha256).hexdigest()
@@ -1111,12 +1120,12 @@ class Handler(BaseHTTPRequestHandler):
         page = f'''<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Connexion - RouteVelo</title><style>
-:root{{--bg:#f4f7f7;--text:#162421;--muted:#63736f;--line:#dce5e2;--accent:#126b58;--soft:#eaf4f1}}
+:root{{--bg:#faf7ff;--text:#261d31;--muted:#746a80;--line:#ebe4f2;--accent:#7c3aed;--soft:#f4efff}}
 *{{box-sizing:border-box}}body{{margin:0;min-height:100dvh;display:grid;place-items:center;padding:20px;background:var(--bg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text)}}
-.card{{width:min(100%,390px);background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 16px 44px rgba(24,56,49,.12)}}
+.card{{width:min(100%,390px);background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 16px 44px rgba(76,29,149,.12)}}
 .brand{{display:flex;align-items:center;gap:12px;margin-bottom:24px}}.icon{{width:48px;height:48px;display:grid;place-items:center;background:var(--soft);border-radius:15px;font-size:26px}}
 h1{{font-size:22px;margin:0}}p{{margin:5px 0 0;color:var(--muted);font-size:13px}}label{{display:block;font-size:13px;font-weight:700;margin-bottom:7px}}
-input{{width:100%;min-height:50px;border:1px solid var(--line);border-radius:13px;padding:11px 13px;font:inherit;font-size:16px;outline:none}}input:focus{{border-color:#7db5a8;box-shadow:0 0 0 3px rgba(18,107,88,.1)}}
+input{{width:100%;min-height:50px;border:1px solid var(--line);border-radius:13px;padding:11px 13px;font:inherit;font-size:16px;outline:none}}input:focus{{border-color:#a78bfa;box-shadow:0 0 0 3px rgba(124,58,237,.12)}}
 button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;background:var(--accent);color:#fff;font:inherit;font-weight:800;cursor:pointer}}
 .error{{margin:0 0 14px;padding:10px 12px;border-radius:11px;background:#fff0f0;color:#9e2e2e;font-size:13px}}
 </style></head><body><main class="card"><div class="brand"><div class="icon">🚴</div><div><h1>RouteVelo</h1><p>Accès privé</p></div></div>{message}
@@ -1159,14 +1168,24 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def log_message(self, fmt, *args):
         print("[%s] %s" % (self.log_date_time_string(), fmt % args))
 
-    def send_json(self, obj, status=200):
-        raw = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+    def _send_bytes(self, raw, content_type, status=200, cache_control="no-store", etag=None):
+        use_gzip = len(raw) >= 1024 and "gzip" in self.headers.get("Accept-Encoding", "").lower()
+        body = gzip.compress(raw, compresslevel=5) if use_gzip else raw
         self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(raw)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", cache_control)
+        self.send_header("Vary", "Accept-Encoding")
+        if use_gzip:
+            self.send_header("Content-Encoding", "gzip")
+        if etag:
+            self.send_header("ETag", etag)
         self.end_headers()
-        self.wfile.write(raw)
+        self.wfile.write(body)
+
+    def send_json(self, obj, status=200):
+        raw = json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self._send_bytes(raw, "application/json; charset=utf-8", status=status, cache_control="no-store")
 
     def send_error_json(self, message, status=500):
         self.send_json({"error": str(message)}, status=status)
@@ -1174,7 +1193,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/health":
-            return self.send_json({"status": "ok", "version": "19"})
+            return self.send_json({"status": "ok", "version": "25"})
         if parsed.path == "/login":
             if self._is_authenticated():
                 return self._redirect("/")
@@ -1200,15 +1219,21 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
         if not self._is_authenticated():
             return self.send_error_json("Authentification requise.", 401)
         try:
-            if parsed.path == "/api/route":
+            if parsed.path in {"/api/route", "/api/trace", "/api/height"}:
                 payload = read_json(self)
-                return self.send_json(post_valhalla("/route", payload))
-            if parsed.path == "/api/trace":
-                payload = read_json(self)
-                return self.send_json(post_valhalla("/trace_attributes", payload))
-            if parsed.path == "/api/height":
-                payload = read_json(self)
-                return self.send_json(post_valhalla("/height", payload))
+                endpoint = {
+                    "/api/route": "/route",
+                    "/api/trace": "/trace_attributes",
+                    "/api/height": "/height",
+                }[parsed.path]
+                key = _payload_cache_key("valhalla-v25:" + endpoint, payload)
+                cached = _cache_get(key) if key else None
+                if cached is not None:
+                    return self.send_json(cached)
+                data = post_valhalla(endpoint, payload)
+                if key:
+                    _cache_put(key, data)
+                return self.send_json(data)
             if parsed.path == "/api/pois":
                 return self.handle_pois()
             return self.send_error_json("Endpoint introuvable.", 404)
@@ -1227,6 +1252,10 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
         if len(q) > 220:
             return self.send_error_json("Recherche trop longue.", 400)
         try:
+            cache_key = ("geocode-v25", unicodedata.normalize("NFKC", q).strip().casefold())
+            cached = _cache_get(cache_key)
+            if cached is not None:
+                return self.send_json(cached)
             nominatim_gate.wait()
             query = urllib.parse.urlencode({
                 "q": q,
@@ -1243,11 +1272,13 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             if not data:
                 return self.send_error_json("Adresse introuvable.", 404)
             hit = data[0]
-            return self.send_json({
+            result = {
                 "lat": float(hit["lat"]),
                 "lng": float(hit["lon"]),
                 "label": hit.get("display_name") or q,
-            })
+            }
+            _cache_put(cache_key, result)
+            return self.send_json(result)
         except RuntimeError as exc:
             return self.send_error_json(exc, 502)
         except Exception:
@@ -1401,14 +1432,18 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             return self.send_error_json("Chemin interdit.", 403)
         if not candidate.is_file():
             return self.send_error_json("Fichier introuvable.", 404)
+        stat = candidate.stat()
+        etag = f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
         raw = candidate.read_bytes()
         ctype = mimetypes.guess_type(str(candidate))[0] or "application/octet-stream"
-        self.send_response(200)
-        self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") else ""))
-        self.send_header("Content-Length", str(len(raw)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(raw)
+        content_type = ctype + ("; charset=utf-8" if ctype.startswith("text/") or ctype in {"application/javascript", "application/json"} else "")
+        self._send_bytes(raw, content_type, cache_control="no-cache", etag=etag)
 
 
 def _open_browser(url: str) -> None:

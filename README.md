@@ -132,3 +132,13 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Après le premier calcul, RouteVelo compare la distance obtenue à la distance cible.
 - Si l’écart dépasse environ 3 %, les points de passage sont automatiquement rapprochés ou éloignés puis la boucle est recalculée une fois.
 - La sélection finale privilégie les boucles à environ ±4 % de la distance demandée, tout en conservant l’optimisation anti aller-retour.
+
+## V25 - Performance + nouvelle direction artistique
+
+- Palette rose/violet sobre, sans police externe ni effet visuel lourd.
+- Tracés simplifiés uniquement pour l'affichage (le GPX et les calculs gardent la géométrie complète).
+- Rendu Leaflet Canvas et animations carte allégées.
+- Cache client des POI par itinéraire et rendu progressif par type de POI.
+- Cache serveur des géocodages et réponses Valhalla identiques.
+- Compression gzip des réponses et revalidation ETag des fichiers statiques.
+- Génération de boucles avec arrêt anticipé quand trois bonnes propositions sont déjà disponibles.
