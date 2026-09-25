@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <!-- RouteVelo V22 -->
+  <!-- RouteVelo V23 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
@@ -1598,7 +1598,7 @@
       }
 
       function buildLoopWaypoints(start, targetKm, seed, variant = 0) {
-        // V22: formes plus contraintes et legerement irregulieres.
+        // V23: formes variees mais generation plus rapide et robuste.
         // Plus de sommets = moins de chances que le moteur revienne sur le meme axe.
         const sides = 5 + (variant % 4);
         const orientation = (11 + seed * 43 + variant * 29) % 360;
@@ -1678,8 +1678,8 @@
         const kx = 111320 * Math.max(0.15, Math.cos(refLat));
         const ky = 110540;
         const gridM = 35;
-        const maxNearM = 30;
-        const maxHeadingDiff = 22;
+        const maxNearM = 18;
+        const maxHeadingDiff = 16;
         const buckets = new Map();
         let repeatM = 0;
         let longestRepeatM = 0;
@@ -1754,16 +1754,20 @@
         const repeatKm = retrace.repeatM / 1000;
         const longestRepeatKm = retrace.longestRepeatM / 1000;
 
-        // V22: filtre dur. Hors de la zone depart/arrivee, on n'accepte
-        // que de tres petites reprises dues aux carrefours/arrondis GPS.
-        const maxLongestM = 120;
-        const maxTotalM = 200;
-        const acceptable = retrace.longestRepeatM <= maxLongestM && retrace.repeatM <= maxTotalM;
+        // V23 : on ne bloque plus toute la generation pour quelques dizaines de metres
+        // detectes comme communs. On classe les boucles par qualite et on garde en
+        // priorite celles qui ont le moins de reprise de route.
+        let qualityTier = 3;
+        if (retrace.longestRepeatM <= 250 && retrace.repeatM <= 500) qualityTier = 0;       // excellente
+        else if (retrace.longestRepeatM <= 800 && retrace.repeatM <= 1500) qualityTier = 1; // tres bonne
+        else if (retrace.longestRepeatM <= 2200 && retrace.repeatM <= 4000) qualityTier = 2; // secours raisonnable
+
         return {
           ...retrace,
           distanceErrorKm,
-          acceptable,
-          score: distanceErrorKm * 0.45 + repeatKm * 14 + longestRepeatKm * 22 + retrace.repeatRuns * 0.8
+          qualityTier,
+          acceptable: qualityTier <= 1,
+          score: distanceErrorKm * 0.40 + repeatKm * 9.0 + longestRepeatKm * 15.0 + retrace.repeatRuns * 0.7
         };
       }
 
@@ -1774,7 +1778,9 @@
             return route;
           })
           .sort((a, b) => {
-            if (a.loopQuality.acceptable !== b.loopQuality.acceptable) return a.loopQuality.acceptable ? -1 : 1;
+            if (a.loopQuality.qualityTier !== b.loopQuality.qualityTier) {
+              return a.loopQuality.qualityTier - b.loopQuality.qualityTier;
+            }
             return a.loopQuality.score - b.loopQuality.score;
           });
       }
@@ -1815,14 +1821,14 @@
           const targetKm = Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
           els.loopDistance.value = targetKm;
           const candidates = [];
-          const maxAttempts = 24;
+          const maxAttempts = 12;
 
-          // V22 : filtre dur des reprises de route loin du depart.
-          // On genere davantage de candidats plutot que de garder une boucle en aller-retour.
+          // V23 : generation rapide. On prefere trois boucles propres, mais on ne
+          // laisse plus le filtre anti-aller-retour empecher completement l'affichage.
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const seed = state.loopSeed + attempt * 5;
             const loopWaypoints = buildLoopWaypoints(start, targetKm, seed, attempt);
-            setStatus(`Recherche de boucles sans aller-retour… ${attempt + 1}/${maxAttempts}`);
+            setStatus(`Recherche de boucles optimisées… ${attempt + 1}/${maxAttempts}`);
             try {
               const route = await fetchSingleRoute(serial, { waypoints: loopWaypoints, loop: true });
               if (serial !== state.requestSerial) return false;
@@ -1830,13 +1836,11 @@
               route.loopQuality = scoreLoopCandidate(route, start, targetKm);
               candidates.push(route);
 
-              // Dès que plusieurs bonnes solutions sont trouvées, inutile de
-              // continuer jusqu'au nombre maximal de requetes. On garde néanmoins assez de
-              // candidats pour proposer trois boucles réellement différentes.
-              if (attempt >= 10) {
+              // Des que trois solutions excellentes ou tres bonnes existent, on les affiche.
+              if (attempt >= 5) {
                 const rankedNow = rankLoopCandidates(candidates, start, targetKm);
-                const good = rankedNow.filter(r => r.loopQuality && r.loopQuality.acceptable);
-                if (good.length >= 6) break;
+                const good = rankedNow.filter(r => r.loopQuality && r.loopQuality.qualityTier <= 1);
+                if (good.length >= 3) break;
               }
             } catch (_) {}
           }
@@ -1847,16 +1851,17 @@
             throw new Error('Impossible de créer une boucle routable depuis ce départ. Essayez une autre distance ou une autre ville.');
           }
 
-          // V22: aucune boucle avec un aller-retour significatif au milieu
-          // n'est utilisee comme solution de secours. On prefere afficher moins
-          // de propositions plutot qu'une mauvaise boucle.
-          const clean = ranked.filter(route => route.loopQuality && route.loopQuality.acceptable);
-          if (!clean.length) {
-            throw new Error('Aucune boucle sans aller-retour significatif trouvée. Relancez pour essayer d’autres orientations ou ajustez légèrement la distance.');
-          }
-          const distanceToleranceKm = Math.max(4, targetKm * 0.18);
-          const cleanClose = clean.filter(route => route.loopQuality.distanceErrorKm <= distanceToleranceKm);
-          const selectionPool = cleanClose.length >= 3 ? cleanClose : clean;
+          // Priorite : excellente -> tres bonne -> secours raisonnable. Si le reseau
+          // routier local est contraint, on montre quand meme les meilleures boucles
+          // disponibles au lieu de ne rien afficher.
+          const excellent = ranked.filter(r => r.loopQuality && r.loopQuality.qualityTier === 0);
+          const good = ranked.filter(r => r.loopQuality && r.loopQuality.qualityTier <= 1);
+          const usable = ranked.filter(r => r.loopQuality && r.loopQuality.qualityTier <= 2);
+          let selectionPool = excellent.length >= 3 ? excellent : (good.length >= 3 ? good : (usable.length >= 3 ? usable : ranked));
+
+          const distanceToleranceKm = Math.max(5, targetKm * 0.22);
+          const closeToTarget = selectionPool.filter(route => route.loopQuality.distanceErrorKm <= distanceToleranceKm);
+          if (closeToTarget.length >= 3) selectionPool = closeToTarget;
           const chosen = selectionPool.slice(0, 3);
           chosen.forEach((route, index) => { route.label = `Boucle ${index + 1}`; });
 
@@ -1867,8 +1872,8 @@
           renderRouteChoices();
           renderLoopPreviews(chosen);
           setStatus(chosen.length >= 3
-            ? '3 boucles propres proposées : les reprises du même axe loin du départ ont été rejetées.'
-            : `${chosen.length} boucle${chosen.length > 1 ? 's' : ''} propre${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Les autres ont été rejetées car elles repassaient sur le même axe.`);
+            ? '3 boucles proposées : priorité aux tracés avec le moins de route reprise.'
+            : `${chosen.length} boucle${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}.`);
           return true;
         } catch (err) {
           if (String(err.message).includes('remplacée')) return false;
