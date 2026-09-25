@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- RouteVelo V31 -->
+<!-- RouteVelo V32 -->
 <html lang="fr">
 <head>
   <!-- RouteVelo V26 -->
@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="26" />
+  <meta name="routevelo-version" content="32" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -46,9 +46,16 @@
       min-height: 100vh;
       display: grid;
       grid-template-columns: minmax(315px, 390px) 1fr;
+      grid-template-rows: 100vh auto;
+      align-items: start;
     }
 
     .sidebar {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      position: sticky;
+      top: 0;
+      height: 100vh;
       background: var(--panel);
       border-right: 1px solid var(--line);
       padding: 22px;
@@ -190,8 +197,8 @@
     .poi-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .pill { font-size: 11px; padding: 5px 8px; border-radius: 999px; background: #f6f2fa; border: 1px solid var(--line); }
 
-    .map-wrap { position: relative; min-width: 0; }
-    #map { width: 100%; height: 100vh; }
+    .map-wrap { grid-column: 2; grid-row: 1; position: relative; min-width: 0; height: 100vh; }
+    #map { width: 100%; height: 100%; }
 
     .map-tip {
       position: absolute;
@@ -332,6 +339,68 @@
     .summary-status { flex: 1 1 auto; min-width: 0; padding: 8px 10px; }
     .gpx-map-btn { flex: 1 1 auto; min-height: 40px; white-space: nowrap; }
     .summary-extra { display: grid; gap: 8px; min-width: 0; }
+
+    .below-map {
+      grid-column: 2;
+      grid-row: 2;
+      min-width: 0;
+      padding: 34px clamp(18px, 4vw, 54px) 56px;
+      background: linear-gradient(180deg, #faf7ff 0%, #fff 34%, #faf7ff 100%);
+      border-top: 1px solid var(--line);
+    }
+    .details-shell { width: min(1120px, 100%); margin: 0 auto; }
+    .details-head { margin-bottom: 20px; }
+    .details-kicker { color: var(--pink); font-size: 11px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .details-head h2 { margin: 4px 0 5px; font-size: clamp(22px, 3vw, 32px); letter-spacing: -.025em; }
+    .details-head p { margin: 0; max-width: 690px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .details-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr); gap: 16px; align-items: start; }
+    .details-column { display: grid; gap: 12px; min-width: 0; }
+    .detail-card, .nutrition-panel {
+      min-width: 0;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.96);
+      box-shadow: 0 8px 24px rgba(76,29,149,.06);
+    }
+    .detail-card-head, .nutrition-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+    .detail-card-title, .nutrition-title { font-size: 14px; font-weight: 850; color: var(--text); }
+    .detail-card-subtitle, .nutrition-subtitle { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .download-card .gpx-map-btn { width: 100%; min-height: 46px; }
+
+    .nutrition-panel { position: sticky; top: 18px; }
+    .nutrition-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .nutrition-settings label { display: grid; gap: 5px; }
+    .nutrition-settings select { min-height: 40px; }
+    .nutrition-food-title { margin: 2px 0 8px; font-size: 11px; color: var(--muted); font-weight: 750; }
+    .nutrition-foods { display: grid; gap: 7px; }
+    .nutrition-food-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) 78px;
+      gap: 8px;
+      align-items: center;
+      min-height: 42px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: #fcfaff;
+    }
+    .nutrition-food-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+    .nutrition-food-name { min-width: 0; font-size: 12px; font-weight: 760; }
+    .nutrition-carb-field { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; }
+    .nutrition-carb-field input { width: 48px !important; min-height: 32px !important; padding: 5px 6px !important; text-align: right; border-radius: 8px !important; font-size: 12px !important; }
+    .nutrition-custom-name { width: 100%; min-height: 32px !important; padding: 5px 7px !important; font-size: 12px !important; border-radius: 8px !important; }
+    .nutrition-actions { display: grid; gap: 8px; margin-top: 12px; }
+    .nutrition-plan { display: grid; gap: 9px; margin-top: 12px; }
+    .nutrition-plan-summary { padding: 10px 11px; border-radius: 11px; background: #f7f1ff; border: 1px solid #eadcff; font-size: 11px; line-height: 1.45; color: var(--accent-2); }
+    .nutrition-timeline { display: grid; gap: 7px; }
+    .nutrition-event { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 9px; align-items: start; padding: 9px 10px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+    .nutrition-event-time { display: grid; gap: 2px; }
+    .nutrition-event-time strong { font-size: 12px; color: var(--pink); }
+    .nutrition-event-time span { font-size: 9px; color: var(--muted); }
+    .nutrition-event-main strong { display: block; font-size: 12px; }
+    .nutrition-event-main small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.35; }
+    .nutrition-note { margin-top: 10px; color: var(--muted); font-size: 10px; line-height: 1.45; }
 
     .elevation-panel {
       min-width: 0;
@@ -492,11 +561,11 @@
       .map-summary { right: 18px; bottom: 18px; }
       .map-summary-main { flex-direction: column; }
       .map-summary-actions { min-width: 0; flex-basis: auto; }
-      .filter-panel { bottom: 232px; }
+      .filter-panel { bottom: 150px; }
     }
 
     @media (max-width: 850px) {
-      html, body { width: 100%; min-height: 100%; overflow: hidden; }
+      html, body { width: 100%; min-height: 100%; overflow-x: hidden; overflow-y: auto; }
       body.mobile-panel-open { overflow: hidden; }
       .app { display: block; min-height: 100dvh; }
       .map-wrap { height: 100dvh; min-height: 100dvh; }
@@ -573,15 +642,11 @@
         padding: 7px;
         gap: 6px;
         border-radius: 13px;
-        max-height: 132px;
-        overflow-y: auto;
-        overflow-x: hidden;
+        max-height: none;
+        overflow: visible;
         display: flex;
         flex-direction: column;
-        overscroll-behavior: contain;
         touch-action: pan-y;
-        scrollbar-width: thin;
-        scrollbar-color: #d9c9f4 transparent;
       }
       .map-summary-main { display: block; min-width: 0; flex: 0 0 auto; }
       .summary-extra { display: grid; gap: 6px; min-width: 0; flex: 0 0 auto; padding-top: 2px; }
@@ -603,6 +668,14 @@
       .roadtype-subtitle { font-size:9px; }
       .roadtype-row { grid-template-columns:minmax(78px,auto) 1fr 34px; gap:6px; font-size:9px; }
       .roadtype-track { height:6px; }
+      .below-map { padding: 24px 12px 42px; }
+      .details-head { margin-bottom: 14px; }
+      .details-head h2 { font-size: 24px; }
+      .details-grid { grid-template-columns: 1fr; gap: 10px; }
+      .detail-card, .nutrition-panel { padding: 12px; border-radius: 14px; }
+      .nutrition-panel { position: static; }
+      .nutrition-settings { grid-template-columns: 1fr 1fr; }
+      .nutrition-food-row { grid-template-columns: auto minmax(0, 1fr) 72px; }
       .route-choices {
         position: static;
         z-index: auto;
@@ -649,6 +722,8 @@
       .summary-status { display: none; }
       .map-summary-actions { display: block; }
       .gpx-map-btn { width: 100%; }
+      .nutrition-settings { grid-template-columns: 1fr; }
+      .nutrition-event { grid-template-columns: 58px minmax(0, 1fr); }
     }
 
     /* V26 — DA rose/violet sobre + profil d'élévation SVG léger. */
@@ -767,32 +842,6 @@
             <div class="summary-stat"><strong id="descendStat">—</strong><span>D−</span></div>
           </div>
         </div>
-        <div class="summary-extra">
-          <div class="map-summary-actions">
-            <button id="gpxBtn" class="btn btn-primary gpx-map-btn" type="button" disabled>Télécharger GPX</button>
-          </div>
-          <div id="elevationPanel" class="elevation-panel hidden" aria-label="Profil d’élévation du parcours">
-            <div class="elevation-head">
-              <span class="elevation-title">Profil d’élévation</span>
-              <span id="elevationMeta" class="elevation-meta"></span>
-            </div>
-            <svg id="elevationChart" class="elevation-chart" viewBox="0 0 760 130" preserveAspectRatio="none" role="img" aria-label="Altitude selon la distance">
-              <defs>
-                <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop>
-                  <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <div id="roadTypePanel" class="roadtype-panel hidden" aria-label="Répartition des types de voie">
-            <div class="roadtype-head">
-              <span class="roadtype-title">Type de route</span>
-              <span class="roadtype-subtitle">part du parcours</span>
-            </div>
-            <div id="roadTypeBars" class="roadtype-bars"></div>
-          </div>
-        </div>
       </div>
 
       <aside id="filterPanel" class="filter-panel collapsed" aria-label="Filtres de la carte">
@@ -814,13 +863,101 @@
       </aside>
       <button id="undoPointBtn" class="undo-point-btn" type="button" disabled aria-label="Annuler le dernier point ajouté">↶ Annuler le point</button>
     </section>
+
+    <section id="routeDetails" class="below-map" aria-label="Détails du parcours">
+      <div class="details-shell">
+        <div class="details-head">
+          <div class="details-kicker">Après la carte</div>
+          <h2>Détails du parcours</h2>
+          <p>Fais défiler la page : le bas de la carte reste volontairement compact, et toutes les informations détaillées sont ici.</p>
+        </div>
+        <div class="details-grid">
+          <div class="details-column">
+            <div class="detail-card download-card">
+              <div class="detail-card-head">
+                <div><div class="detail-card-title">GPX</div><div class="detail-card-subtitle">Exporte le tracé actuellement sélectionné.</div></div>
+              </div>
+              <button id="gpxBtn" class="btn btn-primary gpx-map-btn" type="button" disabled>Télécharger GPX</button>
+            </div>
+
+            <div id="elevationPanel" class="elevation-panel hidden" aria-label="Profil d’élévation du parcours">
+              <div class="elevation-head">
+                <span class="elevation-title">Profil d’élévation</span>
+                <span id="elevationMeta" class="elevation-meta"></span>
+              </div>
+              <svg id="elevationChart" class="elevation-chart" viewBox="0 0 760 130" preserveAspectRatio="none" role="img" aria-label="Altitude selon la distance">
+                <defs>
+                  <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop>
+                    <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+
+            <div id="roadTypePanel" class="roadtype-panel hidden" aria-label="Répartition des types de voie">
+              <div class="roadtype-head">
+                <span class="roadtype-title">Type de route</span>
+                <span class="roadtype-subtitle">part du parcours</span>
+              </div>
+              <div id="roadTypeBars" class="roadtype-bars"></div>
+            </div>
+          </div>
+
+          <section id="nutritionPanel" class="nutrition-panel" aria-label="Plan nutritionnel">
+            <div class="nutrition-head">
+              <div><div class="nutrition-title">Plan nutritionnel</div><div id="nutritionRouteHint" class="nutrition-subtitle">Calcule un trajet pour créer ton plan.</div></div>
+            </div>
+            <div class="nutrition-settings">
+              <label>Objectif glucides / h
+                <select id="nutritionCarbsRate">
+                  <option value="30">30 g/h</option>
+                  <option value="45">45 g/h</option>
+                  <option value="60" selected>60 g/h</option>
+                  <option value="75">75 g/h</option>
+                  <option value="90">90 g/h</option>
+                </select>
+              </label>
+              <label>Eau / h
+                <select id="nutritionWaterRate">
+                  <option value="300">300 ml/h</option>
+                  <option value="500" selected>500 ml/h</option>
+                  <option value="650">650 ml/h</option>
+                  <option value="750">750 ml/h</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="nutrition-food-title">Choisis ce que tu veux emporter · glucides par portion modifiables</div>
+            <div id="nutritionFoods" class="nutrition-foods">
+              <div class="nutrition-food-row" data-food="bonbons"><input class="nutrition-food-check" type="checkbox" checked /><span class="nutrition-food-name">🍬 Bonbons</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" /> g</span></div>
+              <div class="nutrition-food-row" data-food="gel"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">⚡ Gel</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="25" /> g</span></div>
+              <div class="nutrition-food-row" data-food="pate-fruit"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍓 Pâte de fruit</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" /> g</span></div>
+              <div class="nutrition-food-row" data-food="barre"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥣 Barre</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" /> g</span></div>
+              <div class="nutrition-food-row" data-food="compote"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍎 Compote</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="18" /> g</span></div>
+              <div class="nutrition-food-row" data-food="banane"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍌 Banane</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="23" /> g</span></div>
+              <div class="nutrition-food-row" data-food="boisson"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥤 Boisson énergétique</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" /> g</span></div>
+              <div class="nutrition-food-row" data-food="custom"><input id="nutritionCustomEnabled" class="nutrition-food-check" type="checkbox" /><input id="nutritionCustomName" class="nutrition-custom-name" type="text" placeholder="Autre aliment" /><span class="nutrition-carb-field"><input id="nutritionCustomCarbs" class="nutrition-food-carbs" type="number" min="1" max="100" value="25" /> g</span></div>
+            </div>
+            <div class="nutrition-actions">
+              <button id="nutritionGenerateBtn" class="btn btn-primary full" type="button" disabled>Créer mon plan nutrition</button>
+            </div>
+            <div id="nutritionPlan" class="nutrition-plan hidden">
+              <div id="nutritionPlanSummary" class="nutrition-plan-summary"></div>
+              <div id="nutritionTimeline" class="nutrition-timeline"></div>
+            </div>
+            <div class="nutrition-note">Les quantités sont des repères personnalisables. Modifie les valeurs selon les produits que tu utilises et ce que tu tolères pendant l’effort.</div>
+          </section>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
     (() => {
       'use strict';
-      // RouteVelo V31
+      // RouteVelo V32
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -866,7 +1003,19 @@
         filterPanel: document.getElementById('filterPanel'),
         filterToggleBtn: document.getElementById('filterToggleBtn'),
         filterBody: document.getElementById('filterBody'),
-        filterChevron: document.getElementById('filterChevron')
+        filterChevron: document.getElementById('filterChevron'),
+        nutritionPanel: document.getElementById('nutritionPanel'),
+        nutritionRouteHint: document.getElementById('nutritionRouteHint'),
+        nutritionCarbsRate: document.getElementById('nutritionCarbsRate'),
+        nutritionWaterRate: document.getElementById('nutritionWaterRate'),
+        nutritionFoods: document.getElementById('nutritionFoods'),
+        nutritionCustomEnabled: document.getElementById('nutritionCustomEnabled'),
+        nutritionCustomName: document.getElementById('nutritionCustomName'),
+        nutritionCustomCarbs: document.getElementById('nutritionCustomCarbs'),
+        nutritionGenerateBtn: document.getElementById('nutritionGenerateBtn'),
+        nutritionPlan: document.getElementById('nutritionPlan'),
+        nutritionPlanSummary: document.getElementById('nutritionPlanSummary'),
+        nutritionTimeline: document.getElementById('nutritionTimeline')
       };
 
       const state = {
@@ -883,6 +1032,8 @@
         routeEncoded: '',
         routeSafe: false,
         elevationCursorMarker: null,
+        currentRoute: null,
+        nutritionPlanActive: false,
         routeOptions: [],
         selectedRouteOption: -1,
         poiLayers: { water: L.layerGroup(), cemetery: L.layerGroup(), bakery: L.layerGroup() },
@@ -1146,6 +1297,136 @@
         els.roadTypePanel.classList.toggle('hidden', !rows.length);
       }
 
+      const NUTRITION_STORAGE_KEY = 'routevelo-nutrition-v1';
+
+      function nutritionFoodRows() {
+        return els.nutritionFoods ? [...els.nutritionFoods.querySelectorAll('.nutrition-food-row')] : [];
+      }
+
+      function readNutritionSettings() {
+        const foods = nutritionFoodRows().map(row => {
+          const check = row.querySelector('.nutrition-food-check');
+          const carbsInput = row.querySelector('.nutrition-food-carbs');
+          const key = row.dataset.food || '';
+          let name = row.querySelector('.nutrition-food-name')?.textContent?.replace(/^\S+\s*/, '').trim() || '';
+          if (key === 'custom') name = (els.nutritionCustomName?.value || '').trim() || 'Autre aliment';
+          return {
+            key,
+            enabled: Boolean(check?.checked),
+            name,
+            carbs: Math.max(1, Math.min(100, Number(carbsInput?.value) || 1))
+          };
+        });
+        return {
+          carbsRate: Math.max(20, Math.min(120, Number(els.nutritionCarbsRate?.value) || 60)),
+          waterRate: Math.max(200, Math.min(1200, Number(els.nutritionWaterRate?.value) || 500)),
+          foods
+        };
+      }
+
+      function saveNutritionSettings() {
+        try { localStorage.setItem(NUTRITION_STORAGE_KEY, JSON.stringify(readNutritionSettings())); } catch (_) {}
+      }
+
+      function loadNutritionSettings() {
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(NUTRITION_STORAGE_KEY) || 'null'); } catch (_) {}
+        if (!saved || typeof saved !== 'object') return;
+        if (els.nutritionCarbsRate && saved.carbsRate) els.nutritionCarbsRate.value = String(saved.carbsRate);
+        if (els.nutritionWaterRate && saved.waterRate) els.nutritionWaterRate.value = String(saved.waterRate);
+        const byKey = new Map(Array.isArray(saved.foods) ? saved.foods.map(f => [f.key, f]) : []);
+        nutritionFoodRows().forEach(row => {
+          const item = byKey.get(row.dataset.food || '');
+          if (!item) return;
+          const check = row.querySelector('.nutrition-food-check');
+          const carbsInput = row.querySelector('.nutrition-food-carbs');
+          if (check) check.checked = Boolean(item.enabled);
+          if (carbsInput && Number.isFinite(Number(item.carbs))) carbsInput.value = String(item.carbs);
+          if (row.dataset.food === 'custom' && els.nutritionCustomName && item.name && item.name !== 'Autre aliment') els.nutritionCustomName.value = item.name;
+        });
+      }
+
+      function updateNutritionAvailability() {
+        const route = state.currentRoute;
+        const hasRoute = Boolean(route && Number(route.distance) > 0 && Number(route.time) > 0);
+        if (els.nutritionGenerateBtn) els.nutritionGenerateBtn.disabled = !hasRoute;
+        if (els.nutritionRouteHint) {
+          els.nutritionRouteHint.textContent = hasRoute
+            ? `${fmtKm(route.distance)} · ${fmtTime(route.time)} — choisis tes aliments puis génère le plan.`
+            : 'Calcule un trajet pour créer ton plan.';
+        }
+      }
+
+      function resetNutritionPlan({ keepActive = false } = {}) {
+        if (!keepActive) state.nutritionPlanActive = false;
+        if (els.nutritionPlan) els.nutritionPlan.classList.add('hidden');
+        if (els.nutritionPlanSummary) els.nutritionPlanSummary.textContent = '';
+        if (els.nutritionTimeline) els.nutritionTimeline.innerHTML = '';
+        updateNutritionAvailability();
+      }
+
+      function formatNutritionClock(minutes) {
+        const total = Math.max(0, Math.round(minutes));
+        const h = Math.floor(total / 60);
+        const m = total % 60;
+        return h ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`;
+      }
+
+      function generateNutritionPlan() {
+        if (!state.currentRoute || !(state.currentRoute.time > 0) || !(state.currentRoute.distance > 0)) {
+          resetNutritionPlan();
+          return false;
+        }
+        const settings = readNutritionSettings();
+        saveNutritionSettings();
+        const foods = settings.foods.filter(food => food.enabled && food.carbs > 0 && food.name.trim());
+        if (!foods.length) {
+          state.nutritionPlanActive = false;
+          els.nutritionPlan.classList.remove('hidden');
+          els.nutritionPlanSummary.textContent = 'Choisis au moins un aliment avant de créer le plan.';
+          els.nutritionTimeline.innerHTML = '';
+          return false;
+        }
+
+        const durationMin = Math.max(10, Number(state.currentRoute.time) / 60000);
+        const durationH = durationMin / 60;
+        const distanceKm = Number(state.currentRoute.distance) / 1000;
+        const totalCarbTarget = settings.carbsRate * durationH;
+        const totalWaterTarget = settings.waterRate * durationH;
+        const eventCount = Math.max(1, Math.min(16, Math.round(durationMin / 30)));
+        const carbPerEventTarget = totalCarbTarget / eventCount;
+        const waterPerEvent = Math.max(100, Math.round((totalWaterTarget / eventCount) / 50) * 50);
+        const events = [];
+        let plannedCarbs = 0;
+
+        for (let i = 0; i < eventCount; i++) {
+          const fraction = (i + 1) / (eventCount + 1);
+          const food = foods[i % foods.length];
+          const servings = Math.max(1, Math.min(4, Math.round(carbPerEventTarget / food.carbs)));
+          const carbs = servings * food.carbs;
+          plannedCarbs += carbs;
+          events.push({
+            minutes: durationMin * fraction,
+            km: distanceKm * fraction,
+            pct: Math.round(fraction * 100),
+            food,
+            servings,
+            carbs,
+            water: waterPerEvent
+          });
+        }
+
+        state.nutritionPlanActive = true;
+        const plannedWaterL = (waterPerEvent * eventCount) / 1000;
+        els.nutritionPlanSummary.innerHTML = `<strong>${fmtTime(state.currentRoute.time)} · ${fmtKm(state.currentRoute.distance)}</strong><br>Objectif réglé : ~${Math.round(totalCarbTarget)} g de glucides sur la sortie. Plan proposé : ${Math.round(plannedCarbs)} g · ~${plannedWaterL.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} L d’eau.`;
+        els.nutritionTimeline.innerHTML = events.map(event => {
+          const foodText = event.servings === 1 ? event.food.name : `${event.food.name} × ${event.servings}`;
+          return `<div class="nutrition-event"><div class="nutrition-event-time"><strong>${formatNutritionClock(event.minutes)}</strong><span>${event.km.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km · ${event.pct}%</span></div><div class="nutrition-event-main"><strong>${escapeHtml(foodText)}</strong><small>≈ ${Math.round(event.carbs)} g glucides · ${event.water} ml d’eau</small></div></div>`;
+        }).join('');
+        els.nutritionPlan.classList.remove('hidden');
+        return true;
+      }
+
       function resetStats() {
         els.distanceStat.textContent = '—';
         els.timeStat.textContent = '—';
@@ -1158,6 +1439,8 @@
         state.routeCoords = [];
         state.routeDistanceCoords = [];
         state.routeEncoded = '';
+        state.currentRoute = null;
+        resetNutritionPlan();
       }
 
       function clearRouteChoices() {
@@ -1797,6 +2080,10 @@
         els.descendStat.textContent = '…';
         resetElevationProfile();
         resetRoadTypeBreakdown();
+        state.currentRoute = { distance: Number(route.distance) || 0, time: Number(route.time) || 0 };
+        updateNutritionAvailability();
+        if (state.nutritionPlanActive) generateNutritionPlan();
+        else resetNutritionPlan({ keepActive: true });
       }
 
       function renderLoopPreviews(routes) {
@@ -3163,6 +3450,23 @@
       els.waterToggle.addEventListener('change', () => renderPois('all'));
       els.bakeryToggle.addEventListener('change', () => renderPois('all'));
       els.gpxBtn.addEventListener('click', downloadGpx);
+      loadNutritionSettings();
+      updateNutritionAvailability();
+      els.nutritionGenerateBtn.addEventListener('click', generateNutritionPlan);
+      [els.nutritionCarbsRate, els.nutritionWaterRate].forEach(control => control.addEventListener('change', () => {
+        saveNutritionSettings();
+        if (state.nutritionPlanActive) generateNutritionPlan();
+      }));
+      nutritionFoodRows().forEach(row => {
+        row.querySelectorAll('input').forEach(input => input.addEventListener('change', () => {
+          saveNutritionSettings();
+          if (state.nutritionPlanActive) generateNutritionPlan();
+        }));
+      });
+      if (els.nutritionCustomName) els.nutritionCustomName.addEventListener('input', () => {
+        saveNutritionSettings();
+        if (state.nutritionPlanActive && els.nutritionCustomEnabled.checked) generateNutritionPlan();
+      });
       els.undoBtn.addEventListener('click', undoLastWaypointChange);
       els.undoPointBtn.addEventListener('click', undoLastWaypointChange);
       els.clearBtn.addEventListener('click', clearAll);

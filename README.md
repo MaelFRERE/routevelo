@@ -1,4 +1,4 @@
-# RouteVelo V31
+# RouteVelo V32
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -188,3 +188,13 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Le profil d’élévation est interactif : glisser la ligne verticale affiche la distance, l’altitude et la pente locale en %.
 - Un point rouge synchronisé apparaît sur la carte à l’endroit correspondant du parcours.
 - Les points de passage grossissent et affichent un halo rose pendant leur déplacement, puis une courte animation confirme le dépôt.
+
+
+## V32 : page déroulante + plan nutritionnel
+
+- La carte reste en haut et le résumé superposé ne contient plus que les 3 propositions et Distance / Temps / D+ / D−.
+- Sous la carte, la page se déroule normalement vers le GPX, le profil d’élévation et le type de route.
+- Ajout d’un plan nutritionnel calculé à partir de la durée et de la distance du parcours sélectionné.
+- L’utilisateur choisit ses aliments (bonbons, gels, pâtes de fruit, barres, compotes, banane, boisson énergétique ou aliment personnalisé) et peut modifier les glucides par portion.
+- Les objectifs de glucides par heure et d’eau par heure sont réglables et sauvegardés localement dans le navigateur.
+- Le plan répartit les prises sur la sortie avec l’heure de passage, le kilomètre, le pourcentage du parcours, les glucides et l’eau.
