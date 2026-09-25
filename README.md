@@ -1,4 +1,4 @@
-# RouteVelo V19
+# RouteVelo V20
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -89,3 +89,12 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Cimetières : IGN BD TOPO devient la source principale ; Overpass n’est plus que le secours.
 - Les recherches IGN utilisent des cercles chevauchants tout le long du parcours afin de ne plus laisser de trous entre deux zones de recherche.
 - Cache POI versionné à nouveau pour ne pas réutiliser les résultats incomplets des versions précédentes.
+
+
+## V20 - 3 boucles cliquables avant les POI
+
+- Le mode Boucle génère jusqu’à 3 boucles distinctes autour de la distance cible.
+- Les 3 tracés sont affichés simultanément sur la carte avec des repères 1, 2 et 3.
+- Cliquer sur un tracé, son repère ou sa carte de choix sélectionne la boucle.
+- Eau, cimetières, boulangeries, contrôle du revêtement et dénivelé ne sont chargés qu’après cette sélection.
+- Les 3 propositions Départ → arrivée restent inchangées.
