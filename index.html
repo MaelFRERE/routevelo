@@ -460,8 +460,10 @@
         padding: 7px;
         gap: 6px;
         border-radius: 13px;
-        max-height: 35dvh;
-        overflow-y: auto;
+        max-height: none;
+        overflow: visible;
+        display: flex;
+        flex-direction: column;
       }
       .map-summary-main { display: block; }
       .map-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
@@ -472,20 +474,18 @@
       .summary-status { min-width: 0; padding: 7px 8px; font-size: 10px; max-height: 48px; overflow: auto; }
       .gpx-map-btn { width: auto; min-height: 44px; padding: 8px 11px; }
       .route-choices {
-        position: fixed;
-        z-index: 1080;
-        top: calc(max(12px, env(safe-area-inset-top)) + 154px);
-        left: 8px;
-        right: 8px;
+        position: static;
+        z-index: auto;
+        width: 100%;
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 6px;
-        padding: 6px;
-        border: 1px solid var(--line);
-        border-radius: 13px;
-        background: rgba(255,255,255,.96);
-        box-shadow: var(--shadow);
-        backdrop-filter: blur(10px);
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        backdrop-filter: none;
       }
       .route-choice { min-width: 0; padding: 8px 7px; }
       .route-choice-title { font-size: 11px; }
@@ -496,8 +496,8 @@
         place-items: center;
         position: absolute;
         z-index: 905;
-        top: calc(max(12px, env(safe-area-inset-top)) + 56px);
-        left: 12px;
+        top: calc(max(12px, env(safe-area-inset-top)) + 132px);
+        left: 10px;
         width: 44px;
         height: 44px;
         border: 1px solid var(--line);
@@ -627,10 +627,10 @@
         </div>
       </div>
 
-      <aside id="filterPanel" class="filter-panel" aria-label="Filtres de la carte">
-        <button id="filterToggleBtn" class="filter-panel-head" type="button" aria-expanded="true" aria-controls="filterBody">
+      <aside id="filterPanel" class="filter-panel collapsed" aria-label="Filtres de la carte">
+        <button id="filterToggleBtn" class="filter-panel-head" type="button" aria-expanded="false" aria-controls="filterBody">
           <span><strong>Filtres</strong><small>Points utiles sur le trajet</small></span>
-          <span id="filterChevron" class="filter-chevron" aria-hidden="true">−</span>
+          <span id="filterChevron" class="filter-chevron" aria-hidden="true">+</span>
         </button>
         <div id="filterBody" class="filter-body">
           <div class="toggle-row">
@@ -1953,6 +1953,12 @@
         if (window.innerWidth > 850) document.body.classList.remove('mobile-panel-open');
         map.invalidateSize();
       });
+
+      // Sur mobile, ouvrir l'itinéraire au premier affichage pour guider l'utilisateur.
+      if (window.innerWidth <= 850) {
+        document.body.classList.add('mobile-panel-open');
+        setTimeout(() => map.invalidateSize(), 260);
+      }
 
       els.modeAB.addEventListener('click', () => switchMode('ab'));
       els.modeLoop.addEventListener('click', () => switchMode('loop'));

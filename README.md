@@ -1,4 +1,4 @@
-# RouteVelo V12
+# RouteVelo V13
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -43,3 +43,10 @@ Les POI sont filtrés à 400 m maximum du tracé. Les cimetières sont indiqués
 - Les trois propositions d’itinéraire sont affichées simultanément sur mobile.
 - Filtres déplacés en haut à droite sur mobile.
 - Bouton flottant ↶ pour annuler la dernière modification d’un point.
+
+
+## V13 mobile
+- Les 3 propositions restent dans le panneau de résumé et ne chevauchent plus le GPX.
+- Les filtres démarrent repliés.
+- Le panneau Itinéraire démarre ouvert sur mobile.
+- Le bouton ↶ est placé sous les contrôles + / − de la carte.
