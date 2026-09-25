@@ -1,4 +1,4 @@
-# RouteVelo V23
+# RouteVelo V24
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -118,10 +118,17 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Polygones de 5 a 8 sommets avec formes irregulieres pour mieux separer les branches.
 
 
-## V23 - génération de boucles rétablie
+## V24 - génération de boucles rétablie
 
 - Le filtre anti-aller-retour n'empêche plus toute la génération.
 - Jusqu'à 12 variantes sont testées au lieu de 24 pour accélérer l'affichage.
 - Les boucles sont classées par qualité : excellente, très bonne, puis meilleur secours disponible.
 - Les faux positifs sur des routes parallèles sont réduits avec une détection plus précise.
 - Les longs aller-retours restent fortement pénalisés, mais l'application affiche toujours les meilleures boucles disponibles.
+
+## V24 — distance des boucles mieux respectée
+
+- La géométrie initiale des boucles est mieux calibrée pour le réseau routier réel.
+- Après le premier calcul, RouteVelo compare la distance obtenue à la distance cible.
+- Si l’écart dépasse environ 3 %, les points de passage sont automatiquement rapprochés ou éloignés puis la boucle est recalculée une fois.
+- La sélection finale privilégie les boucles à environ ±4 % de la distance demandée, tout en conservant l’optimisation anti aller-retour.

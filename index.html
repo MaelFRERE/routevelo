@@ -1598,12 +1598,12 @@
       }
 
       function buildLoopWaypoints(start, targetKm, seed, variant = 0) {
-        // V23: formes variees mais generation plus rapide et robuste.
+        // V24: formes variees + calibration automatique de la distance cible.
         // Plus de sommets = moins de chances que le moteur revienne sur le meme axe.
         const sides = 5 + (variant % 4);
         const orientation = (11 + seed * 43 + variant * 29) % 360;
         const perimeterFactor = 2 * sides * Math.sin(Math.PI / sides);
-        const baseRadiusKm = targetKm / (perimeterFactor * 1.13);
+        const baseRadiusKm = targetKm / (perimeterFactor * 1.28);
         const center = destinationPoint(start, baseRadiusKm, orientation);
         const startAngle = initialBearing(center, start);
         const step = 360 / sides;
@@ -1748,6 +1748,46 @@
         return { repeatM, longestRepeatM, allowedStartM, repeatRuns };
       }
 
+      function scaleLoopWaypointsFromStart(start, waypoints, factor) {
+        const safeFactor = Math.max(0.78, Math.min(1.22, Number(factor) || 1));
+        return waypoints.map((p, index) => {
+          if (index === 0) return { lat: start.lat, lng: start.lng };
+          const distanceKm = coordDistanceM([start.lng, start.lat], [p.lng, p.lat]) / 1000;
+          const bearing = initialBearing(start, p);
+          return destinationPoint(start, distanceKm * safeFactor, bearing);
+        });
+      }
+
+      async function fetchLoopNearTarget(serial, start, targetKm, initialWaypoints) {
+        let waypoints = cloneWaypoints(initialWaypoints);
+        let bestRoute = null;
+        let bestErrorKm = Infinity;
+        const toleranceKm = Math.max(1.5, targetKm * 0.03);
+
+        // Un premier calcul, puis au maximum une correction geometrique.
+        // Cela evite de multiplier les appels au moteur tout en corrigeant
+        // les ecarts typiques de 8 a 15 % causes par le reseau routier reel.
+        for (let round = 0; round < 2; round++) {
+          const route = await fetchSingleRoute(serial, { waypoints, loop: true });
+          if (serial !== state.requestSerial) throw new Error('requete remplacee');
+          const actualKm = Math.max(0.1, (route.distance || 0) / 1000);
+          const errorKm = Math.abs(actualKm - targetKm);
+          if (errorKm < bestErrorKm) {
+            bestErrorKm = errorKm;
+            bestRoute = route;
+            bestRoute.waypoints = cloneWaypoints(waypoints);
+          }
+          if (errorKm <= toleranceKm) break;
+
+          // Homothetie autour du depart. Un amortissement leger evite de
+          // sur-corriger quand le maillage routier est tres contraint.
+          const rawFactor = targetKm / actualKm;
+          const correctionFactor = Math.pow(rawFactor, 0.92);
+          waypoints = scaleLoopWaypointsFromStart(start, waypoints, correctionFactor);
+        }
+        return bestRoute;
+      }
+
       function scoreLoopCandidate(route, start, targetKm) {
         const retrace = measureLoopRetrace(route, start, targetKm);
         const distanceErrorKm = Math.abs((route.distance || 0) / 1000 - targetKm);
@@ -1821,18 +1861,18 @@
           const targetKm = Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
           els.loopDistance.value = targetKm;
           const candidates = [];
-          const maxAttempts = 12;
+          const maxAttempts = 10;
 
-          // V23 : generation rapide. On prefere trois boucles propres, mais on ne
+          // V24 : generation calibree. On prefere trois boucles propres et proches de la cible, mais on ne
           // laisse plus le filtre anti-aller-retour empecher completement l'affichage.
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const seed = state.loopSeed + attempt * 5;
             const loopWaypoints = buildLoopWaypoints(start, targetKm, seed, attempt);
             setStatus(`Recherche de boucles optimisées… ${attempt + 1}/${maxAttempts}`);
             try {
-              const route = await fetchSingleRoute(serial, { waypoints: loopWaypoints, loop: true });
+              const route = await fetchLoopNearTarget(serial, start, targetKm, loopWaypoints);
               if (serial !== state.requestSerial) return false;
-              route.waypoints = cloneWaypoints(loopWaypoints);
+              if (!route) continue;
               route.loopQuality = scoreLoopCandidate(route, start, targetKm);
               candidates.push(route);
 
@@ -1840,7 +1880,8 @@
               if (attempt >= 5) {
                 const rankedNow = rankLoopCandidates(candidates, start, targetKm);
                 const good = rankedNow.filter(r => r.loopQuality && r.loopQuality.qualityTier <= 1);
-                if (good.length >= 3) break;
+                const nearTarget = good.filter(r => r.loopQuality.distanceErrorKm <= Math.max(2, targetKm * 0.04));
+                if (nearTarget.length >= 3) break;
               }
             } catch (_) {}
           }
@@ -1857,11 +1898,24 @@
           const excellent = ranked.filter(r => r.loopQuality && r.loopQuality.qualityTier === 0);
           const good = ranked.filter(r => r.loopQuality && r.loopQuality.qualityTier <= 1);
           const usable = ranked.filter(r => r.loopQuality && r.loopQuality.qualityTier <= 2);
-          let selectionPool = excellent.length >= 3 ? excellent : (good.length >= 3 ? good : (usable.length >= 3 ? usable : ranked));
+          const distanceToleranceKm = Math.max(2, targetKm * 0.04);
+          const closeToTarget = ranked.filter(route => route.loopQuality.distanceErrorKm <= distanceToleranceKm);
 
-          const distanceToleranceKm = Math.max(5, targetKm * 0.22);
-          const closeToTarget = selectionPool.filter(route => route.loopQuality.distanceErrorKm <= distanceToleranceKm);
-          if (closeToTarget.length >= 3) selectionPool = closeToTarget;
+          // V24 : la distance saisie redevient une vraie cible. Si trois boucles
+          // sont a +/- 4 %, on les choisit avant toute autre consideration.
+          // Sinon on complete avec les candidates les plus proches de la cible,
+          // tout en conservant le niveau de qualite anti aller-retour dans le tri.
+          let selectionPool;
+          if (closeToTarget.length >= 3) {
+            selectionPool = closeToTarget;
+          } else {
+            const qualityPool = excellent.length >= 3 ? excellent : (good.length >= 3 ? good : (usable.length >= 3 ? usable : ranked));
+            const closeIds = new Set(closeToTarget.map(r => r.encoded));
+            const remaining = qualityPool
+              .filter(r => !closeIds.has(r.encoded))
+              .sort((a, b) => a.loopQuality.distanceErrorKm - b.loopQuality.distanceErrorKm || a.loopQuality.score - b.loopQuality.score);
+            selectionPool = [...closeToTarget, ...remaining];
+          }
           const chosen = selectionPool.slice(0, 3);
           chosen.forEach((route, index) => { route.label = `Boucle ${index + 1}`; });
 
@@ -1872,7 +1926,7 @@
           renderRouteChoices();
           renderLoopPreviews(chosen);
           setStatus(chosen.length >= 3
-            ? '3 boucles proposées : priorité aux tracés avec le moins de route reprise.'
+            ? `3 boucles proposées autour de ${targetKm} km : priorité aux tracés proches de la cible et avec peu de route reprise.`
             : `${chosen.length} boucle${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}.`);
           return true;
         } catch (err) {
