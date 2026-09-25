@@ -1,4 +1,4 @@
-# RouteVelo V27
+# RouteVelo V28
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -159,3 +159,10 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Après avoir sélectionné un itinéraire, un clic sur la carte ajoute un point de passage à l'endroit logique du trajet et recalcule le tracé.
 - Un bouton **↶ Annuler le point** est placé sous les filtres pour revenir sur la dernière modification de point.
 - Sous le profil d'élévation, un bloc **Type de route** affiche en pourcentage la part de route, piste cyclable, voie de service et autres types de voie à partir du contrôle Valhalla.
+
+## V28 — retour au point de départ
+
+- En mode **Départ → arrivée**, une case **Retour au point de départ** permet de calculer un parcours complet Départ → Arrivée → Départ.
+- L'application cherche **3 propositions complètes** et privilégie un retour différent de l'aller.
+- La distance, le temps, le D+/D−, le profil d'élévation, les types de route, les POI et le GPX correspondent au parcours total aller + retour.
+- Les points ajoutés sur la carte restent modifiables ; le retour au départ reste implicite lors des recalculs.

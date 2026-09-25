@@ -225,6 +225,20 @@
     .location-row { display: grid; grid-template-columns: 1fr; gap: 7px; }
     .location-help { color: var(--muted); font-size: 11px; line-height: 1.4; }
 
+    .checkbox-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: #fcfaff;
+      cursor: pointer;
+    }
+    .checkbox-option input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+    .checkbox-option strong { display: block; font-size: 13px; line-height: 1.25; }
+    .checkbox-option small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.35; }
+
     .waypoint-list { display: grid; gap: 6px; margin-top: 8px; }
     .waypoint-row { display: grid; grid-template-columns: 24px 1fr auto; gap: 7px; align-items: center; font-size: 12px; }
     .waypoint-index { width: 24px; height: 24px; border-radius: 50%; display:grid; place-items:center; background: var(--soft); color: var(--accent-2); font-weight: 800; }
@@ -669,6 +683,10 @@
           </div>
           <label for="endSearch">Arrivée</label>
           <input id="endSearch" type="text" placeholder="Ville ou adresse" />
+          <label class="checkbox-option" for="returnToStart">
+            <input id="returnToStart" type="checkbox" />
+            <span><strong>Retour au point de départ</strong><small>Départ → arrivée → départ, avec un retour différent de l’aller autant que possible.</small></span>
+          </label>
         </div>
 
         <div id="loopControls" class="stack hidden">
@@ -764,6 +782,7 @@
   <script>
     (() => {
       'use strict';
+      // RouteVelo V28
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -777,6 +796,7 @@
         loopControls: document.getElementById('loopControls'),
         startSearch: document.getElementById('startSearch'),
         endSearch: document.getElementById('endSearch'),
+        returnToStart: document.getElementById('returnToStart'),
         loopSearch: document.getElementById('loopSearch'),
         useLocationBtn: document.getElementById('useLocationBtn'),
         useLoopLocationBtn: document.getElementById('useLoopLocationBtn'),
@@ -1139,7 +1159,8 @@
         for (let i = 1; i < progress.length; i++) {
           if (clickIndex < progress[i]) return i;
         }
-        return state.mode === 'ab' ? Math.max(1, state.waypoints.length - 1) : state.waypoints.length;
+        const isRoundTripAB = state.mode === 'ab' && els.returnToStart && els.returnToStart.checked;
+        return state.mode === 'ab' && !isRoundTripAB ? Math.max(1, state.waypoints.length - 1) : state.waypoints.length;
       }
 
       function addPoint(latlng) {
@@ -1731,7 +1752,14 @@
         setStatus('Recalcul du tracé modifié…');
         try {
           const currentWaypoints = cloneWaypoints(state.waypoints);
-          const route = await fetchSingleRoute(serial, { waypoints: currentWaypoints, loop: state.mode === 'loop' });
+          let requestWaypoints = cloneWaypoints(currentWaypoints);
+          const isRoundTripAB = state.mode === 'ab' && els.returnToStart && els.returnToStart.checked;
+          if (isRoundTripAB && requestWaypoints.length >= 2) {
+            const first = requestWaypoints[0];
+            const last = requestWaypoints[requestWaypoints.length - 1];
+            if (haversineM(first, last) > 20) requestWaypoints.push({ lat: first.lat, lng: first.lng });
+          }
+          const route = await fetchSingleRoute(serial, { waypoints: requestWaypoints, loop: state.mode === 'loop' });
           route.waypoints = currentWaypoints;
           if (serial !== state.requestSerial) return false;
           renderRoute(route);
@@ -1770,6 +1798,173 @@
         ];
       }
 
+      function buildABRoundTripWaypoints(start, end, offsetFactor = 0.12, side = 1, variant = 0) {
+        const directKm = Math.max(0.8, haversineM(start, end) / 1000);
+        const bearing = initialBearing(start, end);
+        const offsetKm = Math.min(28, Math.max(0.7, directKm * offsetFactor));
+        const skew = ((variant % 3) - 1) * 0.035;
+        const f1 = Math.max(0.20, Math.min(0.40, 0.30 + skew));
+        const f2 = Math.max(0.60, Math.min(0.80, 0.70 - skew));
+        const returnScale = 1.05 + (variant % 2) * 0.14;
+
+        const along = frac => destinationPoint(start, directKm * frac, bearing);
+        const offset = (frac, direction, scale = 1) => destinationPoint(along(frac), offsetKm * scale, bearing + 90 * direction);
+
+        const outbound1 = offset(f1, side, 0.92);
+        const outbound2 = offset(f2, side, 1.04);
+        const return2 = offset(f2, -side, returnScale);
+        const return1 = offset(f1, -side, returnScale * 0.94);
+
+        return [
+          { lat: start.lat, lng: start.lng },
+          outbound1,
+          outbound2,
+          { lat: end.lat, lng: end.lng },
+          return2,
+          return1,
+          { lat: start.lat, lng: start.lng }
+        ];
+      }
+
+      function measureRoundTripRetrace(route, start, end) {
+        const samples = sampleRouteSegments(route.coords || [], 45);
+        if (!samples.length) return { repeatM: 0, longestRepeatM: 0, repeatRuns: 0 };
+
+        const refLat = ((start.lat + end.lat) / 2) * Math.PI / 180;
+        const kx = 111320 * Math.max(0.15, Math.cos(refLat));
+        const ky = 110540;
+        const gridM = 30;
+        const maxNearM = 14;
+        const maxHeadingDiff = 14;
+        const minAlongGapM = Math.max(350, Math.min(900, (route.distance || 0) * 0.006));
+        const allowedRadiusM = 180;
+        const startCoord = [start.lng, start.lat];
+        const endCoord = [end.lng, end.lat];
+        const buckets = new Map();
+        let repeatM = 0;
+        let longestRepeatM = 0;
+        let currentRunM = 0;
+        let gapInRunM = 0;
+        let repeatRuns = 0;
+        let inRepeatRun = false;
+
+        const bucketKey = (x, y) => `${x},${y}`;
+        const projected = coord => ({ x: coord[0] * kx, y: coord[1] * ky });
+
+        for (const sample of samples) {
+          const inAllowedZone = coordDistanceM(sample.mid, startCoord) <= allowedRadiusM || coordDistanceM(sample.mid, endCoord) <= allowedRadiusM;
+          const p = projected(sample.mid);
+          const gx = Math.floor(p.x / gridM), gy = Math.floor(p.y / gridM);
+          let repeated = false;
+
+          if (!inAllowedZone) {
+            outer:
+            for (let ox = -1; ox <= 1; ox++) {
+              for (let oy = -1; oy <= 1; oy++) {
+                const list = buckets.get(bucketKey(gx + ox, gy + oy));
+                if (!list) continue;
+                for (const prev of list) {
+                  if (sample.along - prev.along < minAlongGapM) continue;
+                  if (headingDifference180(sample.heading, prev.heading) > maxHeadingDiff) continue;
+                  if (Math.hypot(p.x - prev.x, p.y - prev.y) > maxNearM) continue;
+                  repeated = true;
+                  break outer;
+                }
+              }
+            }
+          }
+
+          if (repeated) {
+            if (!inRepeatRun) { repeatRuns += 1; inRepeatRun = true; }
+            repeatM += sample.len;
+            currentRunM += gapInRunM + sample.len;
+            gapInRunM = 0;
+          } else if (currentRunM > 0) {
+            gapInRunM += sample.len;
+            if (gapInRunM > 110) {
+              longestRepeatM = Math.max(longestRepeatM, currentRunM);
+              currentRunM = 0;
+              gapInRunM = 0;
+              inRepeatRun = false;
+            }
+          } else {
+            inRepeatRun = false;
+          }
+
+          if (!inAllowedZone) {
+            const key = bucketKey(gx, gy);
+            if (!buckets.has(key)) buckets.set(key, []);
+            const list = buckets.get(key);
+            list.push({ x: p.x, y: p.y, along: sample.along, heading: sample.heading });
+            if (list.length > 12) list.shift();
+          }
+        }
+
+        longestRepeatM = Math.max(longestRepeatM, currentRunM);
+        return { repeatM, longestRepeatM, repeatRuns };
+      }
+
+      function scoreABRoundTrip(route, start, end) {
+        const retrace = measureRoundTripRetrace(route, start, end);
+        const repeatKm = retrace.repeatM / 1000;
+        const longestKm = retrace.longestRepeatM / 1000;
+        const distanceKm = (route.distance || 0) / 1000;
+        const clean = retrace.longestRepeatM <= 350 && retrace.repeatM <= 750;
+        return {
+          ...retrace,
+          clean,
+          score: repeatKm * 22 + longestKm * 34 + retrace.repeatRuns * 0.8 + distanceKm * 0.015
+        };
+      }
+
+      async function generateABRoundTripRoutes(serial, baseWaypoints) {
+        const start = baseWaypoints[0];
+        const end = baseWaypoints[1];
+        const patterns = [
+          [0.09, 1, 0],
+          [0.11, -1, 1],
+          [0.14, 1, 2],
+          [0.16, -1, 3],
+          [0.19, 1, 4],
+          [0.21, -1, 5]
+        ];
+        let candidates = [];
+
+        for (let i = 0; i < patterns.length; i++) {
+          const [factor, side, variant] = patterns[i];
+          const requestWaypoints = buildABRoundTripWaypoints(start, end, factor, side, variant);
+          const editableWaypoints = cloneWaypoints(requestWaypoints.slice(0, -1));
+          try {
+            const found = i === 0
+              ? await fetchRouteAlternatives(serial, { waypoints: requestWaypoints, loop: false, alternates: 2 })
+              : [await fetchSingleRoute(serial, { waypoints: requestWaypoints, loop: false })];
+            for (const route of found) {
+              route.waypoints = cloneWaypoints(editableWaypoints);
+              route.roundTripQuality = scoreABRoundTrip(route, start, end);
+              candidates = distinctRoutes([...candidates, route]);
+            }
+          } catch (_) {}
+
+          const cleanCount = candidates.filter(r => r.roundTripQuality && r.roundTripQuality.clean).length;
+          if (candidates.length >= 5 && cleanCount >= 3) break;
+        }
+
+        const ranked = distinctRoutes(candidates).sort((a, b) => {
+          const qa = a.roundTripQuality || scoreABRoundTrip(a, start, end);
+          const qb = b.roundTripQuality || scoreABRoundTrip(b, start, end);
+          if (qa.clean !== qb.clean) return qa.clean ? -1 : 1;
+          return qa.score - qb.score;
+        });
+        const clean = ranked.filter(r => r.roundTripQuality && r.roundTripQuality.clean);
+        const pool = clean.length >= 3 ? clean : ranked;
+        const top = pool.slice(0, Math.min(6, pool.length));
+        return chooseThreeByDistance(top);
+      }
+
+      function abCalculateLabel() {
+        return els.returnToStart && els.returnToStart.checked ? 'Calculer 3 allers-retours' : 'Calculer 3 itinéraires';
+      }
+
       async function resolveABEndpoints() {
         const startQuery = els.startSearch.value.trim();
         const endQuery = els.endSearch.value.trim();
@@ -1799,26 +1994,32 @@
         }
         const serial = ++state.requestSerial;
         if (!silent) setBusy(els.calculateBtn, true, 'Recherche…');
-        setStatus('Recherche de 3 itinéraires vélo de route…');
+        const roundTrip = !!(els.returnToStart && els.returnToStart.checked);
+        setStatus(roundTrip ? 'Recherche de 3 allers-retours avec retour différent…' : 'Recherche de 3 itinéraires vélo de route…');
         try {
-          let routes = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 });
-          routes.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
-          routes = distinctRoutes(routes);
+          let routes;
+          if (roundTrip) {
+            routes = await generateABRoundTripRoutes(serial, baseWaypoints);
+          } else {
+            routes = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 });
+            routes.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
+            routes = distinctRoutes(routes);
 
-          // Certains serveurs ou certaines zones renvoient moins de 3 alternatives.
-          // Dans ce cas, on construit des détours routables progressifs puis on trie par distance réelle.
-          if (routes.length < 3 && baseWaypoints.length === 2) {
-            const patterns = [
-              [0.10, 1], [0.10, -1], [0.18, 1], [0.18, -1], [0.28, 1], [0.28, -1]
-            ];
-            for (const [factor, side] of patterns) {
-              if (routes.length >= 3) break;
-              const detourWaypoints = buildABDetourWaypoints(baseWaypoints[0], baseWaypoints[1], factor, side);
-              try {
-                const route = await fetchSingleRoute(serial, { waypoints: detourWaypoints, loop: false });
-                route.waypoints = cloneWaypoints(detourWaypoints);
-                routes = distinctRoutes([...routes, route]);
-              } catch (_) {}
+            // Certains serveurs ou certaines zones renvoient moins de 3 alternatives.
+            // Dans ce cas, on construit des détours routables progressifs puis on trie par distance réelle.
+            if (routes.length < 3 && baseWaypoints.length === 2) {
+              const patterns = [
+                [0.10, 1], [0.10, -1], [0.18, 1], [0.18, -1], [0.28, 1], [0.28, -1]
+              ];
+              for (const [factor, side] of patterns) {
+                if (routes.length >= 3) break;
+                const detourWaypoints = buildABDetourWaypoints(baseWaypoints[0], baseWaypoints[1], factor, side);
+                try {
+                  const route = await fetchSingleRoute(serial, { waypoints: detourWaypoints, loop: false });
+                  route.waypoints = cloneWaypoints(detourWaypoints);
+                  routes = distinctRoutes([...routes, route]);
+                } catch (_) {}
+              }
             }
           }
 
@@ -1839,7 +2040,7 @@
           }
           return false;
         } finally {
-          if (!silent) setBusy(els.calculateBtn, false, 'Calculer 3 itinéraires');
+          if (!silent) setBusy(els.calculateBtn, false, abCalculateLabel());
         }
       }
 
@@ -2656,6 +2857,12 @@
       els.modeLoop.addEventListener('click', () => switchMode('loop'));
       els.useLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLocationBtn));
       els.useLoopLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLoopLocationBtn));
+      if (els.returnToStart) {
+        els.returnToStart.addEventListener('change', () => {
+          clearAll();
+          els.calculateBtn.textContent = abCalculateLabel();
+        });
+      }
       els.calculateBtn.addEventListener('click', () => { closeMobilePanel(); generateABOptions(); });
       els.generateLoopBtn.addEventListener('click', () => { closeMobilePanel(); generateLoop(); });
       els.filterToggleBtn.addEventListener('click', () => {
