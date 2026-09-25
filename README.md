@@ -166,3 +166,11 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - L'application cherche **3 propositions complètes** et privilégie un retour différent de l'aller.
 - La distance, le temps, le D+/D−, le profil d'élévation, les types de route, les POI et le GPX correspondent au parcours total aller + retour.
 - Les points ajoutés sur la carte restent modifiables ; le retour au départ reste implicite lors des recalculs.
+
+
+## V29 — résumé mobile + suppression des petits décrochements
+
+- Sur mobile, le panneau du bas montre d’abord les 3 propositions puis Distance / Temps / D+ / D−. Il se fait défiler pour accéder au GPX, au profil d’élévation et au type de route.
+- Tous les itinéraires passent désormais par un nettoyage géométrique qui détecte les petites excroissances revenant presque au même point et les coupe automatiquement.
+- Le nettoyage s’applique aux trajets A → B, A → B → A, aux boucles et aux tracés recalculés après ajout d’un point.
+- La fermeture normale d’une vraie boucle n’est pas supprimée.

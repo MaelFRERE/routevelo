@@ -331,6 +331,7 @@
     }
     .summary-status { flex: 1 1 auto; min-width: 0; padding: 8px 10px; }
     .gpx-map-btn { flex: 1 1 auto; min-height: 40px; white-space: nowrap; }
+    .summary-extra { display: grid; gap: 8px; min-width: 0; }
 
     .elevation-panel {
       min-width: 0;
@@ -543,12 +544,18 @@
         padding: 7px;
         gap: 6px;
         border-radius: 13px;
-        max-height: none;
-        overflow: hidden;
-        display: grid;
-        grid-template-rows: auto auto;
+        max-height: 132px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        scrollbar-width: thin;
+        scrollbar-color: #d9c9f4 transparent;
       }
-      .map-summary-main { display: grid; grid-template-rows: auto auto; gap: 6px; min-width: 0; }
+      .map-summary-main { display: block; min-width: 0; flex: 0 0 auto; }
+      .summary-extra { display: grid; gap: 6px; min-width: 0; flex: 0 0 auto; padding-top: 2px; }
       .map-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
       .summary-stat { padding: 6px 5px; text-align: center; }
       .summary-stat strong { font-size: 14px; }
@@ -701,7 +708,7 @@
             <input id="loopDistance" type="number" min="10" max="350" step="5" value="80" />
             <button id="generateLoopBtn" class="btn btn-primary" type="button">Proposer 3 boucles</button>
           </div>
-          <div class="note">3 boucles sont recherchées sans portion en aller-retour, avec priorité à la distance demandée.</div>
+          <div class="note">3 boucles sont recherchées sans aller-retour. Les petits décrochements parasites sont coupés automatiquement sur tous les parcours.</div>
         </div>
 
         <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer 3 itinéraires</button>
@@ -730,30 +737,32 @@
             <div class="summary-stat"><strong id="ascendStat">—</strong><span>D+</span></div>
             <div class="summary-stat"><strong id="descendStat">—</strong><span>D−</span></div>
           </div>
+        </div>
+        <div class="summary-extra">
           <div class="map-summary-actions">
             <button id="gpxBtn" class="btn btn-primary gpx-map-btn" type="button" disabled>Télécharger GPX</button>
           </div>
-        </div>
-        <div id="elevationPanel" class="elevation-panel hidden" aria-label="Profil d’élévation du parcours">
-          <div class="elevation-head">
-            <span class="elevation-title">Profil d’élévation</span>
-            <span id="elevationMeta" class="elevation-meta"></span>
+          <div id="elevationPanel" class="elevation-panel hidden" aria-label="Profil d’élévation du parcours">
+            <div class="elevation-head">
+              <span class="elevation-title">Profil d’élévation</span>
+              <span id="elevationMeta" class="elevation-meta"></span>
+            </div>
+            <svg id="elevationChart" class="elevation-chart" viewBox="0 0 760 130" preserveAspectRatio="none" role="img" aria-label="Altitude selon la distance">
+              <defs>
+                <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop>
+                  <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop>
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
-          <svg id="elevationChart" class="elevation-chart" viewBox="0 0 760 130" preserveAspectRatio="none" role="img" aria-label="Altitude selon la distance">
-            <defs>
-              <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop>
-                <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop>
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-        <div id="roadTypePanel" class="roadtype-panel hidden" aria-label="Répartition des types de voie">
-          <div class="roadtype-head">
-            <span class="roadtype-title">Type de route</span>
-            <span class="roadtype-subtitle">part du parcours</span>
+          <div id="roadTypePanel" class="roadtype-panel hidden" aria-label="Répartition des types de voie">
+            <div class="roadtype-head">
+              <span class="roadtype-title">Type de route</span>
+              <span class="roadtype-subtitle">part du parcours</span>
+            </div>
+            <div id="roadTypeBars" class="roadtype-bars"></div>
           </div>
-          <div id="roadTypeBars" class="roadtype-bars"></div>
         </div>
       </div>
 
@@ -782,7 +791,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V28
+      // RouteVelo V29
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1390,6 +1399,108 @@
         return out;
       }
 
+      function routeCoordsLengthM(coords) {
+        let total = 0;
+        for (let i = 1; i < coords.length; i++) {
+          total += haversineM({ lat: coords[i - 1][1], lng: coords[i - 1][0] }, { lat: coords[i][1], lng: coords[i][0] });
+        }
+        return total;
+      }
+
+      function findSmallDetourCut(coords) {
+        if (!Array.isArray(coords) || coords.length < 8) return null;
+        const cumulative = new Float64Array(coords.length);
+        for (let i = 1; i < coords.length; i++) {
+          cumulative[i] = cumulative[i - 1] + haversineM(
+            { lat: coords[i - 1][1], lng: coords[i - 1][0] },
+            { lat: coords[i][1], lng: coords[i][0] }
+          );
+        }
+        const totalM = cumulative[cumulative.length - 1];
+        if (totalM < 500) return null;
+
+        // Une petite boucle parasite revient presque au meme endroit apres avoir
+        // ajoute quelques centaines de metres / kilometres. On coupe uniquement
+        // ces excroissances, jamais une part importante du parcours principal.
+        const minDetourM = 120;
+        const maxDetourM = Math.min(3200, Math.max(700, totalM * 0.12));
+        const maxReconnectM = 24;
+        const refLat = coords[Math.floor(coords.length / 2)][1] * Math.PI / 180;
+        const kx = 111320 * Math.max(0.15, Math.cos(refLat));
+        const ky = 110540;
+        const gridM = 28;
+        const buckets = new Map();
+        const keyOf = (x, y) => `${x},${y}`;
+        let best = null;
+
+        for (let i = 0; i < coords.length; i++) {
+          const c = coords[i];
+          const x = c[0] * kx, y = c[1] * ky;
+          const gx = Math.floor(x / gridM), gy = Math.floor(y / gridM);
+
+          for (let ox = -1; ox <= 1; ox++) {
+            for (let oy = -1; oy <= 1; oy++) {
+              const list = buckets.get(keyOf(gx + ox, gy + oy));
+              if (!list) continue;
+              for (const prev of list) {
+                const pathM = cumulative[i] - cumulative[prev.i];
+                if (pathM < minDetourM || pathM > maxDetourM) continue;
+                if (pathM > totalM * 0.30) continue;
+                const reconnectM = Math.hypot(x - prev.x, y - prev.y);
+                if (reconnectM > maxReconnectM) continue;
+                if (pathM < reconnectM * 6 + 100) continue;
+
+                // Ne jamais confondre la fermeture normale d'un aller-retour ou
+                // d'une boucle avec un petit decroche parasite.
+                const nearWholeRouteClosure = prev.i <= 3 && i >= coords.length - 4;
+                if (nearWholeRouteClosure) continue;
+
+                const savingM = pathM - reconnectM;
+                if (!best || savingM > best.savingM) {
+                  best = { from: prev.i, to: i, savingM, pathM, reconnectM };
+                }
+              }
+            }
+          }
+
+          const key = keyOf(gx, gy);
+          if (!buckets.has(key)) buckets.set(key, []);
+          const list = buckets.get(key);
+          list.push({ i, x, y });
+          if (list.length > 48) list.shift();
+        }
+        return best;
+      }
+
+      function removeSmallRouteDetours(route) {
+        if (!route || !Array.isArray(route.coords) || route.coords.length < 8) return route;
+        let coords = route.coords.slice();
+        let removedM = 0;
+        let cuts = 0;
+
+        // Plusieurs petits decroches peuvent exister sur un meme trajet.
+        for (let pass = 0; pass < 5; pass++) {
+          const cut = findSmallDetourCut(coords);
+          if (!cut) break;
+          coords = coords.slice(0, cut.from + 1).concat(coords.slice(cut.to));
+          removedM += cut.savingM;
+          cuts += 1;
+        }
+
+        if (!cuts || coords.length < 2) return route;
+        const oldDistance = Math.max(1, Number(route.distance) || routeCoordsLengthM(route.coords));
+        const newDistance = routeCoordsLengthM(coords);
+        const timeRatio = Math.max(0.05, Math.min(1, newDistance / oldDistance));
+        return {
+          ...route,
+          coords,
+          encoded: encodePolyline6(coords),
+          distance: newDistance,
+          time: (Number(route.time) || 0) * timeRatio,
+          detoursRemoved: { count: cuts, distance: removedM }
+        };
+      }
+
       function normalizeTrip(trip, raw) {
         if (!trip || !trip.summary || !Array.isArray(trip.legs) || !trip.legs.length) throw new Error('Le moteur n’a renvoyé aucun itinéraire.');
         const coords = [];
@@ -1404,13 +1515,13 @@
           });
         });
         if (coords.length < 2) throw new Error('La géométrie du trajet est vide.');
-        return {
+        return removeSmallRouteDetours({
           distance: Number(trip.summary.length) * 1000,
           time: Number(trip.summary.time) * 1000,
           coords,
           encoded: encodePolyline6(coords),
           raw
-        };
+        });
       }
 
       function normalizeRoute(data) {
