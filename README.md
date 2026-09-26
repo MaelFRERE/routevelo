@@ -1,4 +1,4 @@
-# RouteVelo V38
+# RouteVelo V39
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -249,3 +249,10 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - La vue est configurée pour le vélo et s’ouvre dans un nouvel onglet afin de ne pas perdre l’itinéraire RouteVelo en cours.
 - Mise en page du sélecteur adaptée aux trois boutons, y compris sur mobile.
 - L’intégration utilise la page officielle Strava plutôt que des tuiles internes non documentées.
+
+
+## V39 : retrait Heatmap
+
+- Suppression du bouton Heatmap ajoute en V38.
+- Retour au selecteur simple **Depart -> arrivee / Boucle**.
+- Aucun lien ni code Strava n'est charge par l'application.
