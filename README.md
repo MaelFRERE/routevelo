@@ -1,4 +1,4 @@
-# RouteVelo V34
+# RouteVelo V37
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -216,3 +216,26 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 - Le bouton **Plan nutritionnel** est placé directement sous le profil d’élévation.
 - Après **Créer mon plan nutrition**, les réglages et la liste des aliments disparaissent : la fenêtre affiche uniquement le plan, avec un bouton **Modifier mes aliments** pour revenir aux réglages.
 - Sur ordinateur, un bouton en haut de la carte permet de rétracter ou réafficher le menu de gauche ; le choix est mémorisé dans le navigateur.
+
+
+## V35 — assistant nutrition avancé
+- Plan nutritionnel en 3 étapes : profil, sources de glucides, plan final.
+- Profil : poids, taille, intensité, température, transpiration et tolérance digestive.
+- Objectifs glucides/h et eau/h calculés automatiquement à partir du trajet et du profil, avec bornes prudentes.
+- Le plan indique quand manger, quoi manger, combien de portions, quand boire et combien d’eau.
+- Résumé « à emporter » avec quantité d’aliments et volume d’eau.
+- Réglages enregistrés localement dans le navigateur.
+- Interface optimisée mobile en bottom-sheet.
+
+
+## V36 : nutrition plus simple
+
+- « Transpiration » et « habitude de manger à vélo » deviennent facultatifs.
+- « Je ne sais pas » est la valeur par défaut et déclenche une estimation automatique prudente.
+- Les anciennes valeurs par défaut V35 sont migrées vers le mode automatique.
+- Le calcul garde la durée, le poids, l'intensité et la température comme repères principaux.
+
+
+## V37 : repères chiffrés dans le profil nutrition
+
+Les choix qualitatifs du profil nutrition affichent maintenant une échelle compréhensible : intensité en effort /10, transpiration en ml/h, température en °C et habitude d’apport glucidique en g/h. Les options automatiques restent disponibles pour les utilisateurs qui ne connaissent pas ces valeurs.

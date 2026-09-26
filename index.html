@@ -1042,6 +1042,54 @@
       .nutrition-plan-toolbar .btn { width: 100%; }
     }
 
+
+    /* V35 — assistant nutrition en 3 étapes, pensé mobile. */
+    .nutrition-wizard-progress { display:grid; grid-template-columns:auto 1fr auto 1fr auto; align-items:center; gap:7px; margin-bottom:16px; padding:8px 3px 4px; }
+    .nutrition-progress-step { display:flex; align-items:center; gap:6px; color:#92859f; font-size:10px; font-weight:800; white-space:nowrap; }
+    .nutrition-progress-step b { width:25px; height:25px; display:grid; place-items:center; border-radius:50%; background:#f2edf7; color:#8a7b97; font-size:11px; }
+    .nutrition-progress-step.active { color:var(--accent-2); }
+    .nutrition-progress-step.active b { background:var(--accent); color:#fff; box-shadow:0 4px 12px rgba(124,58,237,.18); }
+    .nutrition-progress-step.done b { background:#f3e8ff; color:var(--accent-2); }
+    .nutrition-progress-line { height:2px; border-radius:999px; background:#eee8f4; }
+    .nutrition-step { min-width:0; }
+    .nutrition-step-head { display:flex; justify-content:space-between; gap:12px; margin-bottom:13px; }
+    .nutrition-step-head strong { display:block; font-size:15px; color:var(--text); }
+    .nutrition-step-head small { display:block; margin-top:4px; color:var(--muted); font-size:11px; line-height:1.45; }
+    .nutrition-profile-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .nutrition-profile-grid label { display:grid; gap:6px; min-width:0; font-size:11px; font-weight:760; color:var(--text); }
+    .nutrition-profile-grid input, .nutrition-profile-grid select { width:100%; min-height:44px; }
+    .nutrition-input-unit { position:relative; display:block; }
+    .nutrition-input-unit input { padding-right:43px !important; }
+    .nutrition-input-unit em { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-style:normal; color:var(--muted); font-size:11px; font-weight:750; pointer-events:none; }
+    .nutrition-profile-preview { margin-top:12px; padding:11px 12px; border:1px solid #e9def7; border-radius:12px; background:#faf7ff; color:var(--accent-2); font-size:11px; line-height:1.5; }
+    .nutrition-wizard-error { margin-top:10px; padding:9px 10px; border-radius:10px; border:1px solid #efc5c5; background:var(--danger-bg); color:var(--danger); font-size:11px; line-height:1.4; }
+    .nutrition-step-actions { position:sticky; bottom:0; z-index:4; display:grid; grid-template-columns:auto minmax(160px,1fr); gap:8px; margin-top:14px; padding:10px 0 max(3px,env(safe-area-inset-bottom)); background:linear-gradient(180deg,rgba(255,255,255,.76),#fff 30%); }
+    .nutrition-step-actions-single { grid-template-columns:1fr; }
+    .nutrition-step-actions .btn { min-height:48px; }
+    .nutrition-carry-summary { margin-top:9px; padding:10px 11px; border:1px solid var(--line); border-radius:11px; background:#fff; color:var(--text); font-size:11px; line-height:1.5; }
+    .nutrition-carry-summary strong { color:var(--accent-2); }
+    .nutrition-plan-actions { grid-template-columns:1fr 1fr; }
+    .nutrition-timeline { margin-top:10px; }
+    .nutrition-event-main .water-only { color:#2563a8; }
+    .nutrition-event-main .event-water { color:#2563a8; font-weight:760; }
+    .nutrition-dialog .nutrition-panel.plan-ready > * { display:initial; }
+    .nutrition-dialog .nutrition-panel.plan-ready { display:block; }
+    .nutrition-dialog .nutrition-actions { position:static; padding:0; background:none; }
+
+    @media (max-width:520px) {
+      .nutrition-wizard-progress { gap:4px; margin-bottom:12px; }
+      .nutrition-progress-step { gap:4px; font-size:9px; }
+      .nutrition-progress-step b { width:23px; height:23px; }
+      .nutrition-profile-grid { grid-template-columns:1fr; gap:9px; }
+      .nutrition-profile-grid input, .nutrition-profile-grid select { min-height:48px; font-size:16px; }
+      .nutrition-step-actions { grid-template-columns:1fr 1.35fr; margin-left:-2px; margin-right:-2px; }
+      .nutrition-step-actions-single { grid-template-columns:1fr; }
+      .nutrition-plan-actions { grid-template-columns:1fr 1fr; }
+      .nutrition-step-actions .btn { min-height:50px; padding-left:10px; padding-right:10px; }
+      .nutrition-event { grid-template-columns:62px minmax(0,1fr); padding:10px; }
+      .nutrition-carry-summary, .nutrition-plan-summary { font-size:11px; }
+    }
+
   </style>
 </head>
 <body>
@@ -1217,47 +1265,97 @@
         </div>
         <button id="nutritionModalClose" class="nutrition-modal-close" type="button" aria-label="Fermer le plan nutritionnel">×</button>
       </div>
-      <section id="nutritionPanel" class="nutrition-panel" aria-label="Réglages du plan nutritionnel">
-        <div class="nutrition-settings">
-          <label>Objectif glucides / h
-            <select id="nutritionCarbsRate">
-              <option value="30">30 g/h</option>
-              <option value="45">45 g/h</option>
-              <option value="60" selected>60 g/h</option>
-              <option value="75">75 g/h</option>
-              <option value="90">90 g/h</option>
-            </select>
-          </label>
-          <label>Eau / h
-            <select id="nutritionWaterRate">
-              <option value="300">300 ml/h</option>
-              <option value="500" selected>500 ml/h</option>
-              <option value="650">650 ml/h</option>
-              <option value="750">750 ml/h</option>
-            </select>
-          </label>
+      <section id="nutritionPanel" class="nutrition-panel" aria-label="Assistant du plan nutritionnel">
+        <div id="nutritionWizardProgress" class="nutrition-wizard-progress" aria-label="Étapes du plan nutritionnel">
+          <span class="nutrition-progress-step active" data-step="1"><b>1</b><span>Profil</span></span>
+          <span class="nutrition-progress-line"></span>
+          <span class="nutrition-progress-step" data-step="2"><b>2</b><span>Glucides</span></span>
+          <span class="nutrition-progress-line"></span>
+          <span class="nutrition-progress-step" data-step="3"><b>3</b><span>Plan</span></span>
         </div>
 
-        <div class="nutrition-food-title">Choisis ce que tu veux emporter · glucides par portion modifiables</div>
-        <div id="nutritionFoods" class="nutrition-foods">
-          <div class="nutrition-food-row" data-food="bonbons"><input class="nutrition-food-check" type="checkbox" checked /><span class="nutrition-food-name">🍬 Bonbons</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" /> g</span></div>
-          <div class="nutrition-food-row" data-food="gel"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">⚡ Gel</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="25" /> g</span></div>
-          <div class="nutrition-food-row" data-food="pate-fruit"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍓 Pâte de fruit</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" /> g</span></div>
-          <div class="nutrition-food-row" data-food="barre"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥣 Barre</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" /> g</span></div>
-          <div class="nutrition-food-row" data-food="compote"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍎 Compote</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="18" /> g</span></div>
-          <div class="nutrition-food-row" data-food="banane"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍌 Banane</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="23" /> g</span></div>
-          <div class="nutrition-food-row" data-food="boisson"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥤 Boisson énergétique</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" /> g</span></div>
-          <div class="nutrition-food-row" data-food="custom"><input id="nutritionCustomEnabled" class="nutrition-food-check" type="checkbox" /><input id="nutritionCustomName" class="nutrition-custom-name" type="text" placeholder="Autre aliment" /><span class="nutrition-carb-field"><input id="nutritionCustomCarbs" class="nutrition-food-carbs" type="number" min="1" max="100" value="25" /> g</span></div>
+        <div id="nutritionStepProfile" class="nutrition-step">
+          <div class="nutrition-step-head">
+            <div><strong>Ton profil pour cette sortie</strong><small>RouteVelo adapte les repères à la durée, au gabarit et aux conditions.</small></div>
+          </div>
+          <div class="nutrition-profile-grid">
+            <label>Poids
+              <span class="nutrition-input-unit"><input id="nutritionWeight" type="number" min="35" max="200" step="0.5" value="70" inputmode="decimal" /><em>kg</em></span>
+            </label>
+            <label>Taille
+              <span class="nutrition-input-unit"><input id="nutritionHeight" type="number" min="130" max="220" step="1" value="175" inputmode="numeric" /><em>cm</em></span>
+            </label>
+            <label>Intensité prévue
+              <select id="nutritionIntensity">
+                <option value="endurance">Endurance tranquille · effort 2–4/10</option>
+                <option value="soutenu" selected>Soutenue · effort 5–6/10</option>
+                <option value="intense">Intense / sportive · effort 7–9/10</option>
+              </select>
+            </label>
+            <label>Conditions
+              <select id="nutritionTemperature">
+                <option value="frais">Frais · moins de 15 °C</option>
+                <option value="tempere" selected>Tempéré · 15–25 °C</option>
+                <option value="chaud">Chaud · plus de 25 °C</option>
+              </select>
+            </label>
+            <label>Transpiration <small>facultatif</small>
+              <select id="nutritionSweat">
+                <option value="auto" selected>Je ne sais pas · estimation auto</option>
+                <option value="faible">Je transpire peu · ≈ 350–500 ml/h</option>
+                <option value="normal">Dans la moyenne · ≈ 500–700 ml/h</option>
+                <option value="forte">Je transpire beaucoup · ≈ 700–900 ml/h</option>
+              </select>
+            </label>
+            <label>Habitude de manger à vélo <small>facultatif</small>
+              <select id="nutritionTolerance">
+                <option value="auto" selected>Je ne sais pas · estimation prudente</option>
+                <option value="prudente">Peu habitué / estomac sensible · ≈ 30–50 g/h</option>
+                <option value="normale">J’ai l’habitude · ≈ 50–75 g/h</option>
+                <option value="entrainee">Très habitué · ≈ 75–90 g/h</option>
+              </select>
+            </label>
+          </div>
+          <div id="nutritionProfilePreview" class="nutrition-profile-preview"></div>
+          <div id="nutritionProfileError" class="nutrition-wizard-error hidden"></div>
+          <div class="nutrition-step-actions nutrition-step-actions-single">
+            <button id="nutritionProfileNextBtn" class="btn btn-primary full" type="button">Choisir mes sources de glucides →</button>
+          </div>
+          <div class="nutrition-note">Les chiffres servent de repères simples pour te situer. Tu peux laisser « Je ne sais pas » : RouteVelo fera l’estimation automatiquement. Ce ne sont pas des objectifs médicaux.</div>
         </div>
-        <div class="nutrition-actions">
-          <button id="nutritionGenerateBtn" class="btn btn-primary full" type="button" disabled>Créer mon plan nutrition</button>
+
+        <div id="nutritionStepFoods" class="nutrition-step hidden">
+          <div class="nutrition-step-head">
+            <div><strong>Qu’est-ce que tu veux manger ?</strong><small>Coche uniquement ce que tu comptes vraiment emporter. Les glucides sont indiqués par portion.</small></div>
+          </div>
+          <div id="nutritionFoods" class="nutrition-foods">
+            <div class="nutrition-food-row" data-food="bonbons"><input class="nutrition-food-check" type="checkbox" checked /><span class="nutrition-food-name">🍬 Bonbons</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" inputmode="numeric" /> g</span></div>
+            <div class="nutrition-food-row" data-food="gel"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">⚡ Gel</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="25" inputmode="numeric" /> g</span></div>
+            <div class="nutrition-food-row" data-food="pate-fruit"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍓 Pâte de fruit</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="20" inputmode="numeric" /> g</span></div>
+            <div class="nutrition-food-row" data-food="barre"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥣 Barre</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" inputmode="numeric" /> g</span></div>
+            <div class="nutrition-food-row" data-food="compote"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍎 Compote</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="18" inputmode="numeric" /> g</span></div>
+            <div class="nutrition-food-row" data-food="banane"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🍌 Banane</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="23" inputmode="numeric" /> g</span></div>
+            <div class="nutrition-food-row" data-food="boisson"><input class="nutrition-food-check" type="checkbox" /><span class="nutrition-food-name">🥤 Boisson énergétique</span><span class="nutrition-carb-field"><input class="nutrition-food-carbs" type="number" min="1" max="100" value="30" inputmode="numeric" /> g</span></div>
+            <div class="nutrition-food-row" data-food="custom"><input id="nutritionCustomEnabled" class="nutrition-food-check" type="checkbox" /><input id="nutritionCustomName" class="nutrition-custom-name" type="text" placeholder="Autre aliment" /><span class="nutrition-carb-field"><input id="nutritionCustomCarbs" class="nutrition-food-carbs" type="number" min="1" max="100" value="25" inputmode="numeric" /> g</span></div>
+          </div>
+          <div id="nutritionFoodsError" class="nutrition-wizard-error hidden"></div>
+          <div class="nutrition-step-actions">
+            <button id="nutritionBackProfileBtn" class="btn btn-soft" type="button">← Profil</button>
+            <button id="nutritionGenerateBtn" class="btn btn-primary" type="button" disabled>Créer mon plan</button>
+          </div>
         </div>
-        <div id="nutritionPlan" class="nutrition-plan hidden">
-          <div class="nutrition-plan-toolbar"><strong>Ton plan</strong><button id="nutritionEditBtn" class="btn btn-soft" type="button">Modifier mes aliments</button></div>
+
+        <div id="nutritionStepPlan" class="nutrition-step hidden">
+          <div class="nutrition-plan-toolbar"><strong>Ton plan nutrition + hydratation</strong></div>
           <div id="nutritionPlanSummary" class="nutrition-plan-summary"></div>
+          <div id="nutritionCarrySummary" class="nutrition-carry-summary"></div>
           <div id="nutritionTimeline" class="nutrition-timeline"></div>
+          <div class="nutrition-step-actions nutrition-plan-actions">
+            <button id="nutritionEditProfileBtn" class="btn btn-soft" type="button">Modifier profil</button>
+            <button id="nutritionEditFoodsBtn" class="btn btn-soft" type="button">Modifier aliments</button>
+          </div>
+          <div class="nutrition-note">Bois régulièrement par petites prises. Les besoins réels varient avec la chaleur, la transpiration, l’intensité et la tolérance digestive.</div>
         </div>
-        <div class="nutrition-note">Les quantités sont des repères personnalisables. Modifie les valeurs selon les produits que tu utilises et ce que tu tolères pendant l’effort.</div>
       </section>
     </div>
   </div>
@@ -1266,7 +1364,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V34
+      // RouteVelo V37
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1322,16 +1420,30 @@
         nutritionModalClose: document.getElementById('nutritionModalClose'),
         nutritionPanel: document.getElementById('nutritionPanel'),
         nutritionRouteHint: document.getElementById('nutritionRouteHint'),
-        nutritionCarbsRate: document.getElementById('nutritionCarbsRate'),
-        nutritionWaterRate: document.getElementById('nutritionWaterRate'),
+        nutritionWizardProgress: document.getElementById('nutritionWizardProgress'),
+        nutritionStepProfile: document.getElementById('nutritionStepProfile'),
+        nutritionStepFoods: document.getElementById('nutritionStepFoods'),
+        nutritionStepPlan: document.getElementById('nutritionStepPlan'),
+        nutritionWeight: document.getElementById('nutritionWeight'),
+        nutritionHeight: document.getElementById('nutritionHeight'),
+        nutritionIntensity: document.getElementById('nutritionIntensity'),
+        nutritionTemperature: document.getElementById('nutritionTemperature'),
+        nutritionSweat: document.getElementById('nutritionSweat'),
+        nutritionTolerance: document.getElementById('nutritionTolerance'),
+        nutritionProfilePreview: document.getElementById('nutritionProfilePreview'),
+        nutritionProfileError: document.getElementById('nutritionProfileError'),
+        nutritionProfileNextBtn: document.getElementById('nutritionProfileNextBtn'),
+        nutritionBackProfileBtn: document.getElementById('nutritionBackProfileBtn'),
         nutritionFoods: document.getElementById('nutritionFoods'),
+        nutritionFoodsError: document.getElementById('nutritionFoodsError'),
         nutritionCustomEnabled: document.getElementById('nutritionCustomEnabled'),
         nutritionCustomName: document.getElementById('nutritionCustomName'),
         nutritionCustomCarbs: document.getElementById('nutritionCustomCarbs'),
         nutritionGenerateBtn: document.getElementById('nutritionGenerateBtn'),
-        nutritionEditBtn: document.getElementById('nutritionEditBtn'),
-        nutritionPlan: document.getElementById('nutritionPlan'),
+        nutritionEditProfileBtn: document.getElementById('nutritionEditProfileBtn'),
+        nutritionEditFoodsBtn: document.getElementById('nutritionEditFoodsBtn'),
         nutritionPlanSummary: document.getElementById('nutritionPlanSummary'),
+        nutritionCarrySummary: document.getElementById('nutritionCarrySummary'),
         nutritionTimeline: document.getElementById('nutritionTimeline'),
         routeApp: document.getElementById('routeApp'),
         desktopSidebarToggle: document.getElementById('desktopSidebarToggle'),
@@ -1357,6 +1469,7 @@
         elevationMiniCursorMarker: null,
         currentRoute: null,
         nutritionPlanActive: false,
+        nutritionWizardStep: 1,
         routeOptions: [],
         selectedRouteOption: -1,
         poiLayers: { water: L.layerGroup(), cemetery: L.layerGroup(), bakery: L.layerGroup() },
@@ -1683,10 +1796,22 @@
         els.roadTypePanel.classList.toggle('hidden', !rows.length);
       }
 
-      const NUTRITION_STORAGE_KEY = 'routevelo-nutrition-v1';
+      const NUTRITION_STORAGE_KEY = 'routevelo-nutrition-v2';
+      const NUTRITION_LEGACY_STORAGE_KEY = 'routevelo-nutrition-v1';
 
       function nutritionFoodRows() {
         return els.nutritionFoods ? [...els.nutritionFoods.querySelectorAll('.nutrition-food-row')] : [];
+      }
+
+      function nutritionProfile() {
+        return {
+          weight: Number(els.nutritionWeight?.value) || 0,
+          height: Number(els.nutritionHeight?.value) || 0,
+          intensity: els.nutritionIntensity?.value || 'soutenu',
+          temperature: els.nutritionTemperature?.value || 'tempere',
+          sweat: els.nutritionSweat?.value || 'auto',
+          tolerance: els.nutritionTolerance?.value || 'auto'
+        };
       }
 
       function readNutritionSettings() {
@@ -1703,11 +1828,7 @@
             carbs: Math.max(1, Math.min(100, Number(carbsInput?.value) || 1))
           };
         });
-        return {
-          carbsRate: Math.max(20, Math.min(120, Number(els.nutritionCarbsRate?.value) || 60)),
-          waterRate: Math.max(200, Math.min(1200, Number(els.nutritionWaterRate?.value) || 500)),
-          foods
-        };
+        return { profileVersion: 36, profile: nutritionProfile(), foods };
       }
 
       function saveNutritionSettings() {
@@ -1717,9 +1838,20 @@
       function loadNutritionSettings() {
         let saved = null;
         try { saved = JSON.parse(localStorage.getItem(NUTRITION_STORAGE_KEY) || 'null'); } catch (_) {}
+        if (!saved || typeof saved !== 'object') {
+          try { saved = JSON.parse(localStorage.getItem(NUTRITION_LEGACY_STORAGE_KEY) || 'null'); } catch (_) {}
+        }
         if (!saved || typeof saved !== 'object') return;
-        if (els.nutritionCarbsRate && saved.carbsRate) els.nutritionCarbsRate.value = String(saved.carbsRate);
-        if (els.nutritionWaterRate && saved.waterRate) els.nutritionWaterRate.value = String(saved.waterRate);
+        const profile = saved.profile || {};
+        if (els.nutritionWeight && Number.isFinite(Number(profile.weight))) els.nutritionWeight.value = String(profile.weight);
+        if (els.nutritionHeight && Number.isFinite(Number(profile.height))) els.nutritionHeight.value = String(profile.height);
+        if (els.nutritionIntensity && profile.intensity) els.nutritionIntensity.value = profile.intensity;
+        if (els.nutritionTemperature && profile.temperature) els.nutritionTemperature.value = profile.temperature;
+        // Migration V36 : les anciennes valeurs par défaut « normal/normale » deviennent
+        // « je ne sais pas » pour ne pas demander à l'utilisateur de deviner.
+        const legacyProfile = !saved.profileVersion;
+        if (els.nutritionSweat) els.nutritionSweat.value = legacyProfile && (!profile.sweat || profile.sweat === 'normal') ? 'auto' : (profile.sweat || 'auto');
+        if (els.nutritionTolerance) els.nutritionTolerance.value = legacyProfile && (!profile.tolerance || profile.tolerance === 'normale') ? 'auto' : (profile.tolerance || 'auto');
         const byKey = new Map(Array.isArray(saved.foods) ? saved.foods.map(f => [f.key, f]) : []);
         nutritionFoodRows().forEach(row => {
           const item = byKey.get(row.dataset.food || '');
@@ -1732,30 +1864,97 @@
         });
       }
 
+      function validateNutritionProfile({ showError = false } = {}) {
+        const p = nutritionProfile();
+        let error = '';
+        if (!(p.weight >= 35 && p.weight <= 200)) error = 'Indique un poids entre 35 et 200 kg.';
+        else if (!(p.height >= 130 && p.height <= 220)) error = 'Indique une taille entre 130 et 220 cm.';
+        if (els.nutritionProfileError) {
+          els.nutritionProfileError.textContent = showError ? error : '';
+          els.nutritionProfileError.classList.toggle('hidden', !showError || !error);
+        }
+        return error ? null : p;
+      }
+
+      function deriveNutritionTargets(profile, durationH) {
+        let carbsRate;
+        if (durationH < 1.25) carbsRate = 30;
+        else if (durationH < 2.5) carbsRate = 45;
+        else if (durationH < 4) carbsRate = 60;
+        else carbsRate = 75;
+        if (profile.intensity === 'soutenu') carbsRate += 5;
+        if (profile.intensity === 'intense') carbsRate += 10;
+        if (profile.weight <= 55) carbsRate -= 5;
+        else if (profile.weight >= 85) carbsRate += 5;
+        const toleranceCap = profile.tolerance === 'prudente' ? 50 : (profile.tolerance === 'entrainee' ? 90 : (profile.tolerance === 'normale' ? 75 : 60));
+        carbsRate = Math.max(25, Math.min(toleranceCap, Math.round(carbsRate / 5) * 5));
+
+        const bsa = Math.sqrt((profile.height * profile.weight) / 3600);
+        let waterRate = bsa * 260;
+        if (profile.intensity === 'soutenu') waterRate += 50;
+        if (profile.intensity === 'intense') waterRate += 100;
+        if (profile.temperature === 'frais') waterRate -= 50;
+        if (profile.temperature === 'chaud') waterRate += 150;
+        if (profile.sweat === 'faible') waterRate -= 75;
+        if (profile.sweat === 'forte') waterRate += 150;
+        waterRate = Math.max(350, Math.min(900, Math.round(waterRate / 50) * 50));
+        return { carbsRate, waterRate, bsa };
+      }
+
+      function updateNutritionProfilePreview() {
+        if (!els.nutritionProfilePreview) return;
+        const route = state.currentRoute;
+        const profile = validateNutritionProfile({ showError: false });
+        if (!route || !(route.time > 0) || !profile) {
+          els.nutritionProfilePreview.textContent = route ? 'Complète ton profil pour voir les objectifs calculés.' : 'Calcule d’abord un itinéraire : sa durée sert à construire le plan.';
+          return;
+        }
+        const durationH = Number(route.time) / 3600000;
+        const targets = deriveNutritionTargets(profile, durationH);
+        const autoNote = profile.sweat === 'auto' || profile.tolerance === 'auto' ? ' · paramètres inconnus estimés automatiquement' : '';
+        els.nutritionProfilePreview.innerHTML = `<strong>Estimation pour ${fmtTime(route.time)} :</strong> environ ${targets.carbsRate} g de glucides/h et ${targets.waterRate} ml d’eau/h${autoNote}. Tu choisiras les aliments à l’étape suivante.`;
+      }
+
+      function setNutritionWizardStep(step, { scroll = true } = {}) {
+        const next = Math.max(1, Math.min(3, Number(step) || 1));
+        state.nutritionWizardStep = next;
+        els.nutritionStepProfile?.classList.toggle('hidden', next !== 1);
+        els.nutritionStepFoods?.classList.toggle('hidden', next !== 2);
+        els.nutritionStepPlan?.classList.toggle('hidden', next !== 3);
+        els.nutritionWizardProgress?.querySelectorAll('.nutrition-progress-step').forEach(node => {
+          const value = Number(node.dataset.step || 0);
+          node.classList.toggle('active', value === next);
+          node.classList.toggle('done', value < next);
+        });
+        if (scroll && els.nutritionDialog) els.nutritionDialog.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
       function updateNutritionAvailability() {
         const route = state.currentRoute;
         const hasRoute = Boolean(route && Number(route.distance) > 0 && Number(route.time) > 0);
         if (els.nutritionGenerateBtn) els.nutritionGenerateBtn.disabled = !hasRoute;
+        if (els.nutritionProfileNextBtn) els.nutritionProfileNextBtn.disabled = !hasRoute;
         const routeText = hasRoute
-          ? `${fmtKm(route.distance)} · ${fmtTime(route.time)} — choisis tes aliments puis génère le plan.`
+          ? `${fmtKm(route.distance)} · ${fmtTime(route.time)} — profil → aliments → plan.`
           : 'Calcule un trajet pour créer ton plan.';
         if (els.nutritionRouteHint) els.nutritionRouteHint.textContent = routeText;
         if (els.nutritionLaunchHint) {
           els.nutritionLaunchHint.textContent = hasRoute
-            ? `${fmtKm(route.distance)} · ${fmtTime(route.time)} — ouvrir le plan.`
-            : 'Choisis tes aliments et prépare ton plan pour le prochain trajet.';
+            ? `${fmtKm(route.distance)} · ${fmtTime(route.time)} — créer ton plan personnalisé.`
+            : 'Crée un plan glucides + hydratation adapté à ton prochain trajet.';
         }
+        updateNutritionProfilePreview();
       }
 
       function openNutritionModal() {
         if (!els.nutritionModal) return;
-        if (els.nutritionPanel) els.nutritionPanel.classList.toggle('plan-ready', Boolean(state.nutritionPlanActive && !els.nutritionPlan?.classList.contains('hidden')));
+        setNutritionWizardStep(state.nutritionPlanActive ? 3 : 1, { scroll: false });
         els.nutritionModal.classList.remove('hidden');
         els.nutritionModal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('nutrition-modal-open');
         requestAnimationFrame(() => {
           els.nutritionModal.classList.add('is-open');
-          els.nutritionModalClose?.focus({ preventScroll: true });
+          (state.nutritionPlanActive ? els.nutritionEditFoodsBtn : els.nutritionWeight)?.focus?.({ preventScroll: true });
         });
       }
 
@@ -1772,10 +1971,10 @@
 
       function resetNutritionPlan({ keepActive = false } = {}) {
         if (!keepActive) state.nutritionPlanActive = false;
-        if (els.nutritionPanel) els.nutritionPanel.classList.remove('plan-ready');
-        if (els.nutritionPlan) els.nutritionPlan.classList.add('hidden');
         if (els.nutritionPlanSummary) els.nutritionPlanSummary.textContent = '';
+        if (els.nutritionCarrySummary) els.nutritionCarrySummary.textContent = '';
         if (els.nutritionTimeline) els.nutritionTimeline.innerHTML = '';
+        if (!keepActive) setNutritionWizardStep(1, { scroll: false });
         updateNutritionAvailability();
       }
 
@@ -1786,69 +1985,132 @@
         return h ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`;
       }
 
+      function roundTo(value, step) {
+        return Math.max(step, Math.round(value / step) * step);
+      }
+
+      function chooseFoodForNeed(foods, need, lastKey, index) {
+        const candidates = [];
+        for (const food of foods) {
+          for (let servings = 1; servings <= 3; servings++) {
+            const carbs = food.carbs * servings;
+            const reusePenalty = food.key === lastKey && foods.length > 1 ? 6 : 0;
+            const rotatePenalty = ((foods.indexOf(food) - index) % foods.length + foods.length) % foods.length * 0.2;
+            candidates.push({ food, servings, carbs, score: Math.abs(need - carbs) + reusePenalty + rotatePenalty });
+          }
+        }
+        candidates.sort((a,b) => a.score - b.score);
+        return candidates[0];
+      }
+
       function generateNutritionPlan() {
-        if (!state.currentRoute || !(state.currentRoute.time > 0) || !(state.currentRoute.distance > 0)) {
+        const route = state.currentRoute;
+        if (!route || !(route.time > 0) || !(route.distance > 0)) {
           resetNutritionPlan();
           return false;
         }
+        const profile = validateNutritionProfile({ showError: true });
+        if (!profile) { setNutritionWizardStep(1); return false; }
         const settings = readNutritionSettings();
         saveNutritionSettings();
         const foods = settings.foods.filter(food => food.enabled && food.carbs > 0 && food.name.trim());
         if (!foods.length) {
-          state.nutritionPlanActive = false;
-          if (els.nutritionPanel) els.nutritionPanel.classList.remove('plan-ready');
-          els.nutritionPlan.classList.remove('hidden');
-          els.nutritionPlanSummary.textContent = 'Choisis au moins un aliment avant de créer le plan.';
-          els.nutritionTimeline.innerHTML = '';
+          if (els.nutritionFoodsError) {
+            els.nutritionFoodsError.textContent = 'Choisis au moins une source de glucides.';
+            els.nutritionFoodsError.classList.remove('hidden');
+          }
+          setNutritionWizardStep(2, { scroll: false });
           return false;
         }
+        els.nutritionFoodsError?.classList.add('hidden');
 
-        const durationMin = Math.max(10, Number(state.currentRoute.time) / 60000);
+        const durationMin = Math.max(10, Number(route.time) / 60000);
         const durationH = durationMin / 60;
-        const distanceKm = Number(state.currentRoute.distance) / 1000;
-        const totalCarbTarget = settings.carbsRate * durationH;
-        const totalWaterTarget = settings.waterRate * durationH;
-        const eventCount = Math.max(1, Math.min(16, Math.round(durationMin / 30)));
-        const carbPerEventTarget = totalCarbTarget / eventCount;
-        const waterPerEvent = Math.max(100, Math.round((totalWaterTarget / eventCount) / 50) * 50);
-        const events = [];
-        let plannedCarbs = 0;
+        const distanceKm = Number(route.distance) / 1000;
+        const targets = deriveNutritionTargets(profile, durationH);
+        const totalCarbTarget = targets.carbsRate * durationH;
+        const totalWaterTarget = targets.waterRate * durationH;
 
-        for (let i = 0; i < eventCount; i++) {
-          const fraction = (i + 1) / (eventCount + 1);
-          const food = foods[i % foods.length];
-          const servings = Math.max(1, Math.min(4, Math.round(carbPerEventTarget / food.carbs)));
-          const carbs = servings * food.carbs;
-          plannedCarbs += carbs;
-          events.push({
-            minutes: durationMin * fraction,
-            km: distanceKm * fraction,
-            pct: Math.round(fraction * 100),
-            food,
-            servings,
-            carbs,
-            water: waterPerEvent
-          });
+        const avgCarbs = foods.reduce((sum,f) => sum + f.carbs, 0) / foods.length;
+        const foodIntervalMin = Math.max(20, Math.min(40, roundTo((avgCarbs / targets.carbsRate) * 60, 5)));
+        const waterIntervalMin = profile.temperature === 'chaud' || profile.sweat === 'forte' ? 15 : (profile.temperature === 'frais' && profile.sweat === 'faible' ? 25 : 20);
+        const waterPerEvent = roundTo(targets.waterRate * waterIntervalMin / 60, 25);
+
+        const events = [];
+        const addEvent = (minutes, kind, payload) => {
+          let event = events.find(e => Math.abs(e.minutes - minutes) <= 6);
+          if (!event) {
+            event = { minutes, food: null, water: 0 };
+            events.push(event);
+          }
+          if (kind === 'food') event.food = payload;
+          if (kind === 'water') event.water = Math.max(event.water, payload);
+        };
+
+        for (let t = waterIntervalMin; t < durationMin - 3; t += waterIntervalMin) addEvent(t, 'water', waterPerEvent);
+
+        let plannedCarbs = 0;
+        let lastKey = '';
+        let foodIndex = 0;
+        for (let t = Math.min(foodIntervalMin, Math.max(20, durationMin * 0.28)); t < durationMin - 5; t += foodIntervalMin) {
+          const targetByNow = Math.min(totalCarbTarget, targets.carbsRate * (t / 60));
+          const need = Math.max(10, targetByNow - plannedCarbs + targets.carbsRate * foodIntervalMin / 120);
+          const pick = chooseFoodForNeed(foods, need, lastKey, foodIndex++);
+          if (!pick) continue;
+          plannedCarbs += pick.carbs;
+          lastKey = pick.food.key;
+          addEvent(t, 'food', pick);
         }
 
+        if (plannedCarbs < totalCarbTarget * 0.78 && durationMin > 45) {
+          const t = Math.max(25, durationMin - Math.min(25, foodIntervalMin));
+          const pick = chooseFoodForNeed(foods, totalCarbTarget - plannedCarbs, lastKey, foodIndex++);
+          if (pick) { plannedCarbs += pick.carbs; addEvent(t, 'food', pick); }
+        }
+
+        events.sort((a,b) => a.minutes - b.minutes);
+        const inventory = new Map();
+        for (const event of events) {
+          if (!event.food) continue;
+          const name = event.food.food.name;
+          inventory.set(name, (inventory.get(name) || 0) + event.food.servings);
+        }
+        const foodCarry = [...inventory.entries()].map(([name,count]) => `${escapeHtml(name)} × ${count}`).join(' · ');
+        const plannedWater = events.reduce((sum,e) => sum + (e.water || 0), 0);
+        const carryWaterL = Math.max(totalWaterTarget, plannedWater) / 1000;
+
         state.nutritionPlanActive = true;
-        const plannedWaterL = (waterPerEvent * eventCount) / 1000;
-        els.nutritionPlanSummary.innerHTML = `<strong>${fmtTime(state.currentRoute.time)} · ${fmtKm(state.currentRoute.distance)}</strong><br>Objectif réglé : ~${Math.round(totalCarbTarget)} g de glucides sur la sortie. Plan proposé : ${Math.round(plannedCarbs)} g · ~${plannedWaterL.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} L d’eau.`;
+        els.nutritionPlanSummary.innerHTML = `<strong>${fmtTime(route.time)} · ${fmtKm(route.distance)}</strong><br>Cible estimée : <strong>${targets.carbsRate} g/h</strong> de glucides · <strong>${targets.waterRate} ml/h</strong> d’eau. Total visé : ~${Math.round(totalCarbTarget)} g · ~${(totalWaterTarget/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})} L.`;
+        els.nutritionCarrySummary.innerHTML = `<strong>À emporter</strong><br>${foodCarry || 'Aliments sélectionnés'}<br>💧 Eau / boisson : environ ${carryWaterL.toLocaleString('fr-FR',{maximumFractionDigits:1})} L.`;
         els.nutritionTimeline.innerHTML = events.map(event => {
-          const foodText = event.servings === 1 ? event.food.name : `${event.food.name} × ${event.servings}`;
-          return `<div class="nutrition-event"><div class="nutrition-event-time"><strong>${formatNutritionClock(event.minutes)}</strong><span>${event.km.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km · ${event.pct}%</span></div><div class="nutrition-event-main"><strong>${escapeHtml(foodText)}</strong><small>≈ ${Math.round(event.carbs)} g glucides · ${event.water} ml d’eau</small></div></div>`;
+          const fraction = Math.max(0, Math.min(1, event.minutes / durationMin));
+          const km = distanceKm * fraction;
+          const pct = Math.round(fraction * 100);
+          let title = '';
+          let detail = '';
+          if (event.food) {
+            const foodText = event.food.servings === 1 ? event.food.food.name : `${event.food.food.name} × ${event.food.servings}`;
+            title = escapeHtml(foodText);
+            detail = `≈ ${Math.round(event.food.carbs)} g glucides`;
+          }
+          if (event.water) {
+            if (!title) title = '💧 Boire';
+            detail += `${detail ? ' · ' : ''}<span class="event-water">${event.water} ml d’eau</span>`;
+          }
+          return `<div class="nutrition-event"><div class="nutrition-event-time"><strong>${formatNutritionClock(event.minutes)}</strong><span>${km.toLocaleString('fr-FR',{maximumFractionDigits:1})} km · ${pct}%</span></div><div class="nutrition-event-main"><strong>${title}</strong><small>${detail}</small></div></div>`;
         }).join('');
-        els.nutritionPlan.classList.remove('hidden');
-        if (els.nutritionPanel) els.nutritionPanel.classList.add('plan-ready');
-        if (els.nutritionDialog) els.nutritionDialog.scrollTo({ top: 0, behavior: 'smooth' });
+        setNutritionWizardStep(3);
         return true;
       }
 
-      function editNutritionPlan() {
+      function editNutritionProfile() {
         state.nutritionPlanActive = false;
-        if (els.nutritionPanel) els.nutritionPanel.classList.remove('plan-ready');
-        if (els.nutritionPlan) els.nutritionPlan.classList.add('hidden');
-        if (els.nutritionDialog) els.nutritionDialog.scrollTo({ top: 0, behavior: 'smooth' });
+        setNutritionWizardStep(1);
+      }
+
+      function editNutritionFoods() {
+        state.nutritionPlanActive = false;
+        setNutritionWizardStep(2);
       }
 
       function resetStats() {
@@ -3913,25 +4175,31 @@
       els.gpxBtn.addEventListener('click', downloadGpx);
       loadNutritionSettings();
       updateNutritionAvailability();
+      setNutritionWizardStep(1, { scroll: false });
       els.nutritionOpenBtn?.addEventListener('click', openNutritionModal);
       els.nutritionModalClose?.addEventListener('click', closeNutritionModal);
       els.nutritionModalBackdrop?.addEventListener('click', closeNutritionModal);
-      els.nutritionGenerateBtn.addEventListener('click', generateNutritionPlan);
-      els.nutritionEditBtn?.addEventListener('click', editNutritionPlan);
-      [els.nutritionCarbsRate, els.nutritionWaterRate].forEach(control => control.addEventListener('change', () => {
+      els.nutritionProfileNextBtn?.addEventListener('click', () => {
+        const profile = validateNutritionProfile({ showError: true });
+        if (!profile || !state.currentRoute) return;
         saveNutritionSettings();
-        if (state.nutritionPlanActive) generateNutritionPlan();
-      }));
+        setNutritionWizardStep(2);
+      });
+      els.nutritionBackProfileBtn?.addEventListener('click', () => setNutritionWizardStep(1));
+      els.nutritionGenerateBtn?.addEventListener('click', generateNutritionPlan);
+      els.nutritionEditProfileBtn?.addEventListener('click', editNutritionProfile);
+      els.nutritionEditFoodsBtn?.addEventListener('click', editNutritionFoods);
+      [els.nutritionWeight, els.nutritionHeight, els.nutritionIntensity, els.nutritionTemperature, els.nutritionSweat, els.nutritionTolerance].filter(Boolean).forEach(control => {
+        control.addEventListener('change', () => { saveNutritionSettings(); updateNutritionProfilePreview(); });
+        if (control.tagName === 'INPUT') control.addEventListener('input', updateNutritionProfilePreview);
+      });
       nutritionFoodRows().forEach(row => {
         row.querySelectorAll('input').forEach(input => input.addEventListener('change', () => {
           saveNutritionSettings();
-          if (state.nutritionPlanActive) generateNutritionPlan();
+          els.nutritionFoodsError?.classList.add('hidden');
         }));
       });
-      if (els.nutritionCustomName) els.nutritionCustomName.addEventListener('input', () => {
-        saveNutritionSettings();
-        if (state.nutritionPlanActive && els.nutritionCustomEnabled.checked) generateNutritionPlan();
-      });
+      if (els.nutritionCustomName) els.nutritionCustomName.addEventListener('input', saveNutritionSettings);
       els.undoBtn.addEventListener('click', undoLastWaypointChange);
       els.undoPointBtn.addEventListener('click', undoLastWaypointChange);
       els.clearBtn.addEventListener('click', clearAll);
