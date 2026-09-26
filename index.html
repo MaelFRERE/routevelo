@@ -131,7 +131,7 @@
 
     .segmented {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr) minmax(0, .95fr);
       gap: 6px;
       padding: 4px;
       background: #f4f0f8;
@@ -147,6 +147,8 @@
       font-weight: 750;
     }
     .segmented button.active { background: white; color: var(--text); box-shadow: 0 2px 8px rgba(76,29,149,.08); }
+    .segmented .heatmap-btn { color: #a21caf; background: linear-gradient(135deg, rgba(219,39,119,.08), rgba(124,58,237,.08)); }
+    .segmented .heatmap-btn:hover { background: linear-gradient(135deg, rgba(219,39,119,.14), rgba(124,58,237,.14)); color: #7e22ce; }
 
     .toggle-row {
       display: flex;
@@ -735,7 +737,8 @@
       .brand-mark { width: 40px; height: 40px; border-radius: 12px; }
       .sidebar .btn, .sidebar input[type="text"], .sidebar input[type="number"] { min-height: 48px; }
       .sidebar input[type="text"], .sidebar input[type="number"] { font-size: 16px; }
-      .segmented button { min-height: 46px; }
+      .segmented button { min-height: 46px; font-size: 12px; padding-left: 6px; padding-right: 6px; }
+      .segmented .heatmap-btn { font-size: 11px; }
       .location-help { display: none; }
 
       .map-summary {
@@ -1109,6 +1112,7 @@
         <div class="segmented" aria-label="Type de trajet">
           <button id="modeAB" type="button" class="active">Départ → arrivée</button>
           <button id="modeLoop" type="button">Boucle</button>
+          <button id="heatmapBtn" class="heatmap-btn" type="button" title="Ouvrir la heatmap cycliste Strava sur cette zone" aria-label="Voir la heatmap des passages cyclistes">🔥 Heatmap</button>
         </div>
 
         <div id="abControls" class="stack">
@@ -1364,7 +1368,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V37
+      // RouteVelo V38
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1374,6 +1378,7 @@
       const els = {
         modeAB: document.getElementById('modeAB'),
         modeLoop: document.getElementById('modeLoop'),
+        heatmapBtn: document.getElementById('heatmapBtn'),
         abControls: document.getElementById('abControls'),
         loopControls: document.getElementById('loopControls'),
         startSearch: document.getElementById('startSearch'),
@@ -4152,8 +4157,19 @@
         setTimeout(() => map.invalidateSize(), 260);
       }
 
+      function openCyclingHeatmap() {
+        const center = map.getCenter();
+        const zoom = Math.max(4, Math.min(18, map.getZoom()));
+        const lat = Number(center.lat).toFixed(6);
+        const lng = Number(center.lng).toFixed(6);
+        const url = `https://www.strava.com/maps/global-heatmap?sport=Ride&style=standard&terrain=false&labels=true&poi=true&cPhotos=false&gColor=purple&gOpacity=100#${zoom}/${lat}/${lng}`;
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!opened) window.location.href = url;
+      }
+
       els.modeAB.addEventListener('click', () => switchMode('ab'));
       els.modeLoop.addEventListener('click', () => switchMode('loop'));
+      els.heatmapBtn?.addEventListener('click', openCyclingHeatmap);
       els.useLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLocationBtn));
       els.useLoopLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLoopLocationBtn));
       if (els.returnToStart) {

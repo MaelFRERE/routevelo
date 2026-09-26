@@ -1,4 +1,4 @@
-# RouteVelo V37
+# RouteVelo V38
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -239,3 +239,13 @@ Les POI sont filtrés à **400 m maximum du tracé réel**. Une fontaine, un lav
 ## V37 : repères chiffrés dans le profil nutrition
 
 Les choix qualitatifs du profil nutrition affichent maintenant une échelle compréhensible : intensité en effort /10, transpiration en ml/h, température en °C et habitude d’apport glucidique en g/h. Les options automatiques restent disponibles pour les utilisateurs qui ne connaissent pas ces valeurs.
+
+
+## V38 : accès Heatmap cycliste
+
+- Nouveau bouton **🔥 Heatmap** placé à droite de **Boucle**.
+- Le bouton ouvre la Global Heatmap Strava directement sur la zone actuellement affichée dans RouteVelo.
+- Le centre et le niveau de zoom de la carte sont repris automatiquement.
+- La vue est configurée pour le vélo et s’ouvre dans un nouvel onglet afin de ne pas perdre l’itinéraire RouteVelo en cours.
+- Mise en page du sélecteur adaptée aux trois boutons, y compris sur mobile.
+- L’intégration utilise la page officielle Strava plutôt que des tuiles internes non documentées.
