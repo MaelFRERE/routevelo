@@ -629,6 +629,9 @@ def _parse_huwise_bakery(record):
         "siret": siret,
         "naf": "",
         "osm_id": osm_id,
+        "opening_hours": str(fields.get("opening_hours") or fields.get("opening_hours_osm") or "").strip(),
+        "phone": str(fields.get("phone") or fields.get("contact_phone") or fields.get("contact:phone") or "").strip(),
+        "website": str(fields.get("website") or fields.get("contact_website") or fields.get("contact:website") or "").strip(),
         "source": "Huwise / OpenDataSoft - donnees OSM",
     }
 
@@ -796,7 +799,7 @@ def _dedupe_businesses(items, max_distance_m=65):
         stable_id = str(item.get("siret") or item.get("osm_id") or item.get("id") or "").strip()
         if stable_id and stable_id in by_id:
             existing = by_id[stable_id]
-            for k in ("address", "siret", "naf", "osm_id"):
+            for k in ("address", "siret", "naf", "osm_id", "opening_hours", "phone", "website"):
                 if not existing.get(k) and item.get(k):
                     existing[k] = item[k]
             continue
@@ -824,7 +827,7 @@ def _dedupe_businesses(items, max_distance_m=65):
                 duplicate = existing
                 break
         if duplicate is not None:
-            for k in ("address", "siret", "naf", "osm_id"):
+            for k in ("address", "siret", "naf", "osm_id", "opening_hours", "phone", "website"):
                 if not duplicate.get(k) and item.get(k):
                     duplicate[k] = item[k]
             sources = [x for x in str(duplicate.get("source") or "").split(" + ") if x]
@@ -1269,7 +1272,11 @@ def merge_bakery_sources(route, radius):
                     "siret": "",
                     "naf": "",
                     "osm_id": str(el.get("id") or ""),
+                    "opening_hours": str(tags.get("opening_hours") or ""),
+                    "phone": str(tags.get("contact:phone") or tags.get("phone") or ""),
+                    "website": str(tags.get("contact:website") or tags.get("website") or ""),
                     "source": "OpenStreetMap / Overpass",
+                    "tags": tags,
                 })
         except Exception as exc:
             errors.append(exc)
@@ -1329,6 +1336,84 @@ def _normalize_cemetery_items(data):
             "source": source,
         })
     return items
+
+
+bakery_detail_cache = {}
+bakery_detail_cache_lock = threading.Lock()
+BAKERY_DETAIL_TTL = 7 * 86400
+
+
+def fetch_osm_bakery_details(lat, lng, name=""):
+    key = (round(float(lat), 4), round(float(lng), 4), _clean_label(name))
+    now = time.time()
+    with bakery_detail_cache_lock:
+        cached = bakery_detail_cache.get(key)
+        if cached and now - cached[0] < BAKERY_DETAIL_TTL:
+            return dict(cached[1])
+
+    query = (
+        f'[out:json][timeout:7];('
+        f'nwr["shop"="bakery"](around:120,{float(lat):.6f},{float(lng):.6f});'
+        ');out center tags qt;'
+    )
+    body = urllib.parse.urlencode({"data": query}).encode("utf-8")
+    last_error = None
+    candidates = []
+    for endpoint in _overpass_endpoints_ordered():
+        req = urllib.request.Request(
+            endpoint, data=body, method="POST",
+            headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "User-Agent": USER_AGENT},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=9) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            candidates = data.get("elements") if isinstance(data, dict) else []
+            if isinstance(candidates, list):
+                break
+        except Exception as exc:
+            last_error = exc
+            candidates = []
+
+    target = {"lat": float(lat), "lng": float(lng)}
+    best = None
+    best_score = float("inf")
+    target_name = _clean_label(name)
+    for el in candidates:
+        pt = _osm_element_point(el)
+        if not pt:
+            continue
+        blat, blng = pt
+        tags = el.get("tags") or {}
+        item = {"lat": blat, "lng": blng}
+        distance = _distance_m(target, item)
+        candidate_name = _clean_label(tags.get("name") or tags.get("brand"))
+        name_penalty = 0 if (not target_name or not candidate_name or target_name == candidate_name or target_name in candidate_name or candidate_name in target_name) else 45
+        score = distance + name_penalty
+        if score < best_score:
+            best_score = score
+            best = (el, tags, blat, blng)
+
+    if best is None:
+        if last_error and not candidates:
+            raise RuntimeError(f"Horaires de la boulangerie indisponibles: {last_error}")
+        result = {"opening_hours": "", "phone": "", "website": "", "address": "", "source": "OpenStreetMap"}
+    else:
+        el, tags, blat, blng = best
+        address_parts = [tags.get("addr:housenumber", ""), tags.get("addr:street", ""), tags.get("addr:postcode", ""), tags.get("addr:city", "")]
+        result = {
+            "opening_hours": str(tags.get("opening_hours") or ""),
+            "phone": str(tags.get("contact:phone") or tags.get("phone") or ""),
+            "website": str(tags.get("contact:website") or tags.get("website") or ""),
+            "address": " ".join(x for x in address_parts if x).strip(),
+            "osm_id": str(el.get("id") or ""),
+            "source": "OpenStreetMap / Overpass",
+        }
+    with bakery_detail_cache_lock:
+        if len(bakery_detail_cache) > 1200:
+            oldest = min(bakery_detail_cache.items(), key=lambda kv: kv[1][0])[0]
+            bakery_detail_cache.pop(oldest, None)
+        bakery_detail_cache[key] = (now, dict(result))
+    return result
 
 
 def _extract_poi_items(kind, data):
@@ -1467,7 +1552,7 @@ def valid_bbox(value):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "RouteVelo/4.0"
+    server_version = "RouteVelo/4.2"
 
     def _auth_token(self):
         return hmac.new(AUTH_SECRET.encode("utf-8"), b"routevelo-auth-v1", hashlib.sha256).hexdigest()
@@ -1560,7 +1645,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/health":
-            return self.send_json({"status": "ok", "version": "40", "poi_cache": local_poi_store.stats()})
+            return self.send_json({"status": "ok", "version": "42", "poi_cache": local_poi_store.stats()})
         if parsed.path == "/login":
             if self._is_authenticated():
                 return self._redirect("/")
@@ -1603,6 +1688,8 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
                 return self.send_json(data)
             if parsed.path == "/api/pois":
                 return self.handle_pois()
+            if parsed.path == "/api/bakery-details":
+                return self.handle_bakery_details()
             return self.send_error_json("Endpoint introuvable.", 404)
         except ValueError as exc:
             return self.send_error_json(exc, 400)
@@ -1650,6 +1737,23 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             return self.send_error_json(exc, 502)
         except Exception:
             return self.send_error_json("La recherche d’adresse a échoué.", 502)
+
+    def handle_bakery_details(self):
+        payload = read_json(self, 20_000)
+        if not isinstance(payload, dict):
+            return self.send_error_json("Requête boulangerie invalide.", 400)
+        try:
+            lat = float(payload.get("lat"))
+            lng = float(payload.get("lng"))
+        except Exception:
+            return self.send_error_json("Coordonnées invalides.", 400)
+        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            return self.send_error_json("Coordonnées invalides.", 400)
+        name = str(payload.get("name") or "")[:160]
+        try:
+            return self.send_json(fetch_osm_bakery_details(lat, lng, name))
+        except RuntimeError as exc:
+            return self.send_error_json(exc, 502)
 
     def handle_pois(self):
         payload = read_json(self, 300_000)

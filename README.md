@@ -1,4 +1,4 @@
-# RouteVelo V41
+# RouteVelo V42
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -276,3 +276,12 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - La section Details du parcours commence juste sous la ligne de flottaison : elle n'apparait plus au bas de la page d'accueil sur PC.
 - La hauteur se recalcule automatiquement si le resume change ou si la fenetre est redimensionnee.
 - Sur mobile, le comportement reste volontairement deroulant : les details restent accessibles en faisant defiler la page sous la carte et le resume.
+
+
+## V42 : profil pente, tracé par type de voie et refonte graphique
+
+- Le profil d’élévation colore en rouge les portions dont la pente montante atteint **3,5 % ou plus**.
+- Le bloc **Type de route** est affiché avant le plan nutritionnel ; ses couleurs sont maintenant appliquées directement au tracé (route violet, piste cyclable vert, voie de service orange, autre gris).
+- Les points de passage numérotés sont projetés visuellement sur la ligne du trajet après chaque calcul/recalcul.
+- Les boulangeries ouvrent une mini-fiche enrichie avec état ouvert/fermé lorsque les horaires OSM sont interprétables, horaires du jour, adresse, téléphone/site si disponibles et bouton Google Maps. Les détails manquants sont chargés uniquement au clic puis mis en cache côté serveur.
+- Refonte visuelle complète conservant la palette violet/rose : cartes plus nettes, hiérarchie améliorée, champs et boutons modernisés, ombres plus douces, micro-animations et adaptation mobile.
