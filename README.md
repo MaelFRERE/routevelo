@@ -1,4 +1,4 @@
-# RouteVelo V39
+# RouteVelo V40
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -256,3 +256,15 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - Suppression du bouton Heatmap ajoute en V38.
 - Retour au selecteur simple **Depart -> arrivee / Boucle**.
 - Aucun lien ni code Strava n'est charge par l'application.
+
+## V40 : base POI locale sur le serveur
+
+- Points d’eau, cimetières et boulangeries sont désormais enregistrés dans une base SQLite locale (`routevelo_pois.sqlite3`) au premier passage dans une zone.
+- Les itinéraires suivants qui repassent dans la même zone lisent directement la base locale au lieu de rappeler Huwise, SIRENE, IGN ou Overpass.
+- Le cache est **spatial** : il profite aussi à un autre itinéraire proche, pas seulement à un tracé strictement identique.
+- Fraîcheur : eau/cimetières ~30 jours, boulangeries ~10 jours. Une zone connue mais ancienne est servie immédiatement puis rafraîchie en arrière-plan.
+- Si une zone n’a jamais été chargée, RouteVelo effectue encore un premier appel aux sources externes afin d’amorcer la base.
+- En cas de panne d’une API, une copie locale déjà disponible est utilisée en secours.
+- `POI_DB_PATH` permet de placer la base sur un disque persistant. Sur un hébergement à système de fichiers éphémère, la base peut être recréée après un redéploiement/redémarrage complet.
+- Le filtrage final reste strict à **400 m du tracé réel** côté navigateur.
+

@@ -7,6 +7,7 @@ import json
 import math
 import os
 import re
+import sqlite3
 import unicodedata
 import hmac
 import hashlib
@@ -49,6 +50,14 @@ OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
 ]
 POI_CACHE_TTL = 900
+# V40: cache spatial persistant des POI. Le fichier est cree automatiquement
+# sur le serveur et peut etre deplace vers un disque persistant via POI_DB_PATH.
+POI_DB_PATH = os.environ.get("POI_DB_PATH", str(ROOT / "routevelo_pois.sqlite3"))
+POI_CELL_DEG = 0.02
+POI_LOCAL_QUERY_RADIUS_M = 650
+POI_COVERAGE_RADIUS_M = {"water": 1200, "bakery": 1200, "cemetery": 850}
+POI_LOCAL_TTL = {"water": 30 * 86400, "bakery": 10 * 86400, "cemetery": 30 * 86400}
+POI_STALE_RETENTION = 180 * 86400
 overpass_pick_lock = threading.Lock()
 overpass_pick_index = 0
 USER_AGENT = "RouteVelo-MVP/1.0 (local road-cycling route planner)"
@@ -73,6 +82,222 @@ class RateGate:
 valhalla_gate = RateGate(1.08)
 nominatim_gate = RateGate(1.08)
 business_gate = RateGate(0.17)  # API Recherche d'entreprises: 7 appels/s max
+
+
+class LocalPoiStore:
+    """Petit cache spatial SQLite pour servir les POI sans requete externe.
+
+    Les resultats distants restent la source de verite. Une fois une zone chargee,
+    les itineraires suivants qui passent dans la meme zone sont servis depuis le
+    disque local en quelques millisecondes. Les zones expirent selon le type de POI
+    et sont rafraichies sans bloquer quand une copie locale existe deja.
+    """
+
+    def __init__(self, path):
+        self.path = str(path)
+        self._lock = threading.RLock()
+        if self.path != ":memory:":
+            Path(self.path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+        self._db = sqlite3.connect(self.path, check_same_thread=False, timeout=8)
+        with self._lock:
+            self._db.execute("PRAGMA journal_mode=WAL")
+            self._db.execute("PRAGMA synchronous=NORMAL")
+            self._db.execute("PRAGMA temp_store=MEMORY")
+            self._db.execute("PRAGMA busy_timeout=5000")
+            self._db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS pois (
+                    kind TEXT NOT NULL,
+                    poi_id TEXT NOT NULL,
+                    cell TEXT NOT NULL,
+                    lat REAL NOT NULL,
+                    lng REAL NOT NULL,
+                    payload TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    PRIMARY KEY (kind, poi_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_pois_kind_cell ON pois(kind, cell);
+                CREATE INDEX IF NOT EXISTS idx_pois_updated ON pois(updated_at);
+                CREATE TABLE IF NOT EXISTS poi_coverage (
+                    kind TEXT NOT NULL,
+                    cell TEXT NOT NULL,
+                    refreshed_at INTEGER NOT NULL,
+                    PRIMARY KEY (kind, cell)
+                );
+                CREATE INDEX IF NOT EXISTS idx_coverage_refreshed ON poi_coverage(refreshed_at);
+                """
+            )
+            cutoff = int(time.time()) - POI_STALE_RETENTION
+            self._db.execute("DELETE FROM pois WHERE updated_at < ?", (cutoff,))
+            self._db.execute("DELETE FROM poi_coverage WHERE refreshed_at < ?", (cutoff,))
+            self._db.commit()
+
+    @staticmethod
+    def _cell_index(lat, lng):
+        return math.floor(float(lat) / POI_CELL_DEG), math.floor(float(lng) / POI_CELL_DEG)
+
+    @classmethod
+    def _cell_token(cls, lat, lng):
+        a, b = cls._cell_index(lat, lng)
+        return f"{a}:{b}"
+
+    @staticmethod
+    def _sample_route(route, spacing_km=0.75, max_points=700):
+        if not route:
+            return []
+        points = [route[0]]
+        for i in range(1, len(route)):
+            a, b = route[i - 1], route[i]
+            seg_km = haversine_km(a, b)
+            pieces = max(1, int(math.ceil(seg_km / spacing_km)))
+            for j in range(1, pieces + 1):
+                f = j / pieces
+                points.append((a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f))
+        if len(points) > max_points:
+            step = (len(points) - 1) / (max_points - 1)
+            points = [points[round(i * step)] for i in range(max_points)]
+        return points
+
+    @classmethod
+    def route_cells(cls, route, radius_m=POI_LOCAL_QUERY_RADIUS_M):
+        cells = set()
+        for lat, lng in cls._sample_route(route):
+            lat_pad = radius_m / 110_540.0
+            lon_pad = radius_m / (111_320.0 * max(0.2, math.cos(math.radians(lat))))
+            min_i = math.floor((lat - lat_pad) / POI_CELL_DEG)
+            max_i = math.floor((lat + lat_pad) / POI_CELL_DEG)
+            min_j = math.floor((lng - lon_pad) / POI_CELL_DEG)
+            max_j = math.floor((lng + lon_pad) / POI_CELL_DEG)
+            for i in range(min_i, max_i + 1):
+                for j in range(min_j, max_j + 1):
+                    cells.add(f"{i}:{j}")
+        return cells
+
+    @staticmethod
+    def _chunks(values, size=400):
+        values = list(values)
+        for i in range(0, len(values), size):
+            yield values[i:i + size]
+
+    def coverage_state(self, kind, route):
+        cells = self.route_cells(route, POI_LOCAL_QUERY_RADIUS_M)
+        if not cells:
+            return "missing", cells
+        timestamps = {}
+        with self._lock:
+            for chunk in self._chunks(cells):
+                marks = ",".join("?" for _ in chunk)
+                rows = self._db.execute(
+                    f"SELECT cell, refreshed_at FROM poi_coverage WHERE kind=? AND cell IN ({marks})",
+                    [kind, *chunk],
+                ).fetchall()
+                timestamps.update((cell, int(ts)) for cell, ts in rows)
+        if len(timestamps) != len(cells):
+            return "missing", cells
+        threshold = int(time.time()) - int(POI_LOCAL_TTL.get(kind, 7 * 86400))
+        if all(ts >= threshold for ts in timestamps.values()):
+            return "fresh", cells
+        return "stale", cells
+
+    def query_route(self, kind, route):
+        cells = self.route_cells(route, POI_LOCAL_QUERY_RADIUS_M)
+        if not cells:
+            return []
+        by_id = {}
+        with self._lock:
+            for chunk in self._chunks(cells):
+                marks = ",".join("?" for _ in chunk)
+                rows = self._db.execute(
+                    f"SELECT poi_id, payload FROM pois WHERE kind=? AND cell IN ({marks})",
+                    [kind, *chunk],
+                ).fetchall()
+                for poi_id, payload in rows:
+                    try:
+                        item = json.loads(payload)
+                    except Exception:
+                        continue
+                    if isinstance(item, dict):
+                        by_id[poi_id] = item
+        return list(by_id.values())
+
+    @staticmethod
+    def _poi_id(kind, item):
+        stable = str(item.get("siret") or item.get("osm_id") or item.get("id") or "").strip()
+        if stable:
+            return stable
+        raw = "|".join([
+            kind,
+            f"{float(item.get('lat', 0)):.6f}",
+            f"{float(item.get('lng', 0)):.6f}",
+            _clean_label(item.get("name")),
+            str(item.get("source") or ""),
+        ])
+        return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+    def put_items(self, kind, items, route):
+        now = int(time.time())
+        rows = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            try:
+                lat, lng = float(item["lat"]), float(item["lng"])
+            except Exception:
+                continue
+            if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                continue
+            clean = dict(item)
+            clean["lat"] = lat
+            clean["lng"] = lng
+            rows.append((
+                kind,
+                self._poi_id(kind, clean),
+                self._cell_token(lat, lng),
+                lat,
+                lng,
+                json.dumps(clean, ensure_ascii=False, separators=(",", ":")),
+                now,
+            ))
+        coverage_radius = int(POI_COVERAGE_RADIUS_M.get(kind, 850))
+        coverage = self.route_cells(route, coverage_radius)
+        with self._lock:
+            if rows:
+                self._db.executemany(
+                    """
+                    INSERT INTO pois(kind, poi_id, cell, lat, lng, payload, updated_at)
+                    VALUES(?,?,?,?,?,?,?)
+                    ON CONFLICT(kind, poi_id) DO UPDATE SET
+                      cell=excluded.cell, lat=excluded.lat, lng=excluded.lng,
+                      payload=excluded.payload, updated_at=excluded.updated_at
+                    """,
+                    rows,
+                )
+            if coverage:
+                self._db.executemany(
+                    """
+                    INSERT INTO poi_coverage(kind, cell, refreshed_at) VALUES(?,?,?)
+                    ON CONFLICT(kind, cell) DO UPDATE SET refreshed_at=excluded.refreshed_at
+                    """,
+                    [(kind, cell, now) for cell in coverage],
+                )
+            self._db.commit()
+        return len(rows)
+
+    def stats(self):
+        with self._lock:
+            counts = dict(self._db.execute("SELECT kind, COUNT(*) FROM pois GROUP BY kind").fetchall())
+            zones = dict(self._db.execute("SELECT kind, COUNT(*) FROM poi_coverage GROUP BY kind").fetchall())
+        return {"points": counts, "cells": zones}
+
+
+try:
+    local_poi_store = LocalPoiStore(POI_DB_PATH)
+except Exception as exc:
+    print(f"[poi local] impossible d'ouvrir {POI_DB_PATH}: {exc}; cache memoire de secours")
+    local_poi_store = LocalPoiStore(":memory:")
+
+poi_refresh_lock = threading.Lock()
+poi_refreshing = set()
 
 
 def upstream_json(url: str, method: str = "GET", payload=None, headers=None, timeout: int = 45):
@@ -1083,6 +1308,148 @@ def merge_cemetery_sources(route, radius):
     return {"elements": [], "source": "IGN BD TOPO + OpenStreetMap"}
 
 
+
+def _normalize_cemetery_items(data):
+    items = []
+    for el in (data or {}).get("elements", []) or []:
+        if not isinstance(el, dict):
+            continue
+        point = _osm_element_point(el)
+        if not point:
+            continue
+        lat, lng = point
+        tags = el.get("tags") if isinstance(el.get("tags"), dict) else {}
+        source = tags.get("source") or (data or {}).get("source") or ""
+        items.append({
+            "id": str(el.get("id") or ""),
+            "lat": lat,
+            "lng": lng,
+            "name": tags.get("name") or "Cimetière",
+            "tags": dict(tags),
+            "source": source,
+        })
+    return items
+
+
+def _extract_poi_items(kind, data):
+    if kind == "water":
+        return [dict(x) for x in (data or {}).get("waters", []) or [] if isinstance(x, dict)]
+    if kind == "bakery":
+        return [dict(x) for x in (data or {}).get("bakeries", []) or [] if isinstance(x, dict)]
+    if kind == "cemetery":
+        return _normalize_cemetery_items(data)
+    return []
+
+
+def _poi_response(kind, items, cache_state="local"):
+    if kind == "water":
+        return {
+            "waters": items,
+            "source": "Base locale RouteVelo",
+            "cache": cache_state,
+        }
+    if kind == "bakery":
+        return {
+            "bakeries": items,
+            "source": "Base locale RouteVelo",
+            "cache": cache_state,
+        }
+    if kind == "cemetery":
+        elements = []
+        for item in items:
+            tags = dict(item.get("tags") or {})
+            tags.setdefault("landuse", "cemetery")
+            tags.setdefault("name", item.get("name") or "Cimetière")
+            if item.get("source"):
+                tags.setdefault("source", item.get("source"))
+            elements.append({
+                "type": "node",
+                "id": item.get("id") or "",
+                "lat": item.get("lat"),
+                "lon": item.get("lng"),
+                "tags": tags,
+            })
+        return {
+            "elements": elements,
+            "source": "Base locale RouteVelo",
+            "cache": cache_state,
+        }
+    return {}
+
+
+def _fetch_remote_pois(kind, route, radius):
+    if kind == "water":
+        return merge_water_sources(route, radius)
+    if kind == "bakery":
+        return merge_bakery_sources(route, radius)
+    if kind == "cemetery":
+        return merge_cemetery_sources(route, radius)
+    raise RuntimeError("Type de POI local inconnu.")
+
+
+def _refresh_poi_store(kind, route, radius):
+    data = _fetch_remote_pois(kind, route, radius)
+    items = _extract_poi_items(kind, data)
+    local_poi_store.put_items(kind, items, route)
+    # On relit par cellules afin de renvoyer aussi les points deja connus dans
+    # les zones chevauchantes, pas uniquement ceux du dernier fournisseur.
+    return local_poi_store.query_route(kind, route)
+
+
+def _refresh_key(kind, route):
+    cells = local_poi_store.route_cells(route, POI_LOCAL_QUERY_RADIUS_M)
+    raw = kind + "|" + "|".join(sorted(cells))
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def _schedule_poi_refresh(kind, route, radius):
+    key = _refresh_key(kind, route)
+    with poi_refresh_lock:
+        if key in poi_refreshing:
+            return
+        poi_refreshing.add(key)
+
+    route_copy = [tuple(p) for p in route]
+
+    def worker():
+        try:
+            _refresh_poi_store(kind, route_copy, radius)
+            print(f"[poi local] {kind}: zone rafraichie en arriere-plan")
+        except Exception as exc:
+            print(f"[poi local] rafraichissement {kind} impossible: {exc}")
+        finally:
+            with poi_refresh_lock:
+                poi_refreshing.discard(key)
+
+    thread = threading.Thread(target=worker, name=f"poi-refresh-{kind}", daemon=True)
+    thread.start()
+
+
+def get_route_pois_local_first(kind, route, radius):
+    """Local d'abord, API distante uniquement si la zone manque ou doit etre amorcee."""
+    state, _ = local_poi_store.coverage_state(kind, route)
+    local_items = local_poi_store.query_route(kind, route)
+
+    if state == "fresh":
+        return _poi_response(kind, local_items, "local")
+
+    # Zone deja connue mais trop ancienne: on ne bloque pas l'utilisateur.
+    # La copie locale est servie tout de suite puis actualisee en arriere-plan.
+    if state == "stale" and local_items:
+        _schedule_poi_refresh(kind, route, radius)
+        return _poi_response(kind, local_items, "local-stale-refreshing")
+
+    try:
+        refreshed = _refresh_poi_store(kind, route, radius)
+        return _poi_response(kind, refreshed, "refreshed")
+    except Exception:
+        # En cas de panne externe, une copie locale meme partielle vaut mieux
+        # qu'un echec complet. Elle reste filtree a 400 m cote navigateur.
+        if local_items:
+            return _poi_response(kind, local_items, "local-fallback")
+        raise
+
+
 def valid_bbox(value):
     if not isinstance(value, list) or len(value) != 4:
         return None
@@ -1100,7 +1467,7 @@ def valid_bbox(value):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "RouteVelo/2.5"
+    server_version = "RouteVelo/4.0"
 
     def _auth_token(self):
         return hmac.new(AUTH_SECRET.encode("utf-8"), b"routevelo-auth-v1", hashlib.sha256).hexdigest()
@@ -1193,7 +1560,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/health":
-            return self.send_json({"status": "ok", "version": "25"})
+            return self.send_json({"status": "ok", "version": "40", "poi_cache": local_poi_store.stats()})
         if parsed.path == "/login":
             if self._is_authenticated():
                 return self._redirect("/")
@@ -1302,58 +1669,20 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             radius = 500
         radius = max(250, min(900, radius))
 
-        if kind == "water":
+        if kind in {"water", "bakery", "cemetery"}:
             if not route:
-                return self.send_error_json("Le trace est requis pour rechercher l'eau potable.", 400)
-            cache_key = (
-                "water-hybrid-v19b",
-                tuple((round(lat, 4), round(lng, 4)) for lat, lng in route),
-            )
-            cached = _cache_get(cache_key)
-            if cached is not None:
-                return self.send_json(cached)
+                labels = {
+                    "water": "l'eau potable",
+                    "bakery": "les boulangeries",
+                    "cemetery": "les cimetieres",
+                }
+                return self.send_error_json(f"Le trace est requis pour rechercher {labels[kind]}.", 400)
             try:
-                data = merge_water_sources(route, radius)
-                _cache_put(cache_key, data)
+                data = get_route_pois_local_first(kind, route, radius)
                 return self.send_json(data)
             except RuntimeError as exc:
-                print(f"[water hybrid] {exc}")
-
-        if kind == "bakery":
-            if not route:
-                return self.send_error_json("Le trace est requis pour rechercher les boulangeries.", 400)
-            cache_key = (
-                "bakery-hybrid-v19b",
-                tuple((round(lat, 4), round(lng, 4)) for lat, lng in route),
-            )
-            cached = _cache_get(cache_key)
-            if cached is not None:
-                return self.send_json(cached)
-            try:
-                data = merge_bakery_sources(route, radius)
-            except RuntimeError as exc:
-                print(f"[bakery] {exc}")
-                return self.send_error_json(f"Boulangeries indisponibles: {exc}", 502)
-            _cache_put(cache_key, data)
-            return self.send_json(data)
-
-        if kind == "cemetery":
-            if not route:
-                return self.send_error_json("Le trace est requis pour rechercher les cimetieres.", 400)
-            cache_key = (
-                "cemetery-ign-v19b", radius,
-                tuple((round(lat, 4), round(lng, 4)) for lat, lng in route),
-            )
-            cached = _cache_get(cache_key)
-            if cached is not None:
-                return self.send_json(cached)
-            try:
-                data = merge_cemetery_sources(route, radius)
-            except RuntimeError as exc:
-                print(f"[cemetery] {exc}")
-                return self.send_error_json(str(exc), 502)
-            _cache_put(cache_key, data)
-            return self.send_json(data)
+                print(f"[poi {kind}] {exc}")
+                return self.send_error_json(f"POI {kind} indisponibles: {exc}", 502)
 
         if route:
             line = ",".join(f"{lat:.5f},{lng:.5f}" for lat, lng in route)
