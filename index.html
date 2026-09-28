@@ -1,13 +1,13 @@
 <!doctype html>
-<!-- RouteVelo V34 -->
+<!-- RouteVelo V44 -->
 <html lang="fr">
 <head>
-  <!-- RouteVelo V26 -->
+  <!-- RouteVelo V44 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="34" />
+  <meta name="routevelo-version" content="44" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -1288,6 +1288,649 @@
       .route-choice:hover, .btn:hover:not(:disabled), .nutrition-launch-btn:hover, .desktop-sidebar-toggle:hover { transform:none; }
     }
 
+
+    /* ===== RouteVelo V44 mockup redesign ===== */
+    :root {
+      --bg: linear-gradient(180deg, #fbf8ff 0%, #f7f3ff 58%, #fbf8ff 100%);
+      --page-bg: #f5f0ff;
+      --panel: rgba(255,255,255,.92);
+      --panel-strong: #ffffff;
+      --surface-2: #f8f4ff;
+      --surface-3: #f2ebff;
+      --text: #231942;
+      --muted: #7c7392;
+      --line: rgba(137, 104, 193, .14);
+      --accent: #7c3aed;
+      --accent-2: #6d28d9;
+      --pink: #ff4d90;
+      --soft: #f3ecff;
+      --shadow: 0 16px 45px rgba(92, 45, 145, .12);
+      --shadow-soft: 0 10px 30px rgba(92, 45, 145, .10);
+      --radius-xl: 26px;
+      --radius-lg: 20px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+    }
+    html, body { min-height: 100%; background: linear-gradient(140deg, rgba(233,220,255,.68), rgba(255,239,247,.88) 35%, rgba(241,237,255,.9)); }
+    body {
+      background-image:
+        radial-gradient(circle at top left, rgba(255, 130, 195, .18), transparent 28%),
+        radial-gradient(circle at top right, rgba(124, 58, 237, .10), transparent 26%),
+        linear-gradient(160deg, rgba(251,248,255,.95), rgba(244,239,255,.98));
+    }
+    .app {
+      max-width: 1480px;
+      margin: 18px auto;
+      padding: 0 18px 18px;
+      gap: 18px;
+      grid-template-columns: minmax(285px, 330px) minmax(0, 1fr);
+      grid-template-rows: auto auto;
+      align-items: start;
+    }
+    .sidebar {
+      position: sticky;
+      top: 18px;
+      height: calc(100vh - 36px);
+      border: 1px solid rgba(255,255,255,.55);
+      border-right: 0;
+      border-radius: 30px;
+      padding: 22px 22px 26px;
+      background: rgba(255,255,255,.80);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+    .brand { margin-bottom: 18px; }
+    .brand-mark {
+      width: 48px; height: 48px; border-radius: 16px;
+      background: linear-gradient(135deg, rgba(236,72,153,.12), rgba(124,58,237,.16));
+      border: 1px solid rgba(124,58,237,.16);
+    }
+    h1 { font-size: 18px; font-weight: 900; letter-spacing: -.03em; color: #1f1560; }
+    .subtitle { font-size: 14px; color: var(--muted); }
+    .section { border-top: 0; padding: 0; }
+    .section-title { font-size: 24px; margin-bottom: 14px; letter-spacing: -.03em; }
+    .segmented {
+      padding: 5px;
+      gap: 5px;
+      border: 1px solid rgba(124,58,237,.10);
+      background: linear-gradient(180deg, #f7f2ff, #efe7ff);
+      border-radius: 17px;
+    }
+    .segmented button {
+      min-height: 44px;
+      font-size: 15px;
+      font-weight: 800;
+      border-radius: 13px;
+    }
+    .segmented button.active {
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,255,255,.9));
+      color: #231942;
+      box-shadow: 0 8px 24px rgba(124,58,237,.10);
+    }
+    .stack { gap: 10px; }
+    label { font-size: 12px; color: #6d6381; font-weight: 800; letter-spacing: .01em; }
+    input[type="text"], input[type="password"], input[type="number"], select {
+      min-height: 46px;
+      border-radius: 15px;
+      border: 1px solid rgba(124,58,237,.11);
+      background: rgba(255,255,255,.98);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+      padding: 11px 14px;
+    }
+    input:focus, select:focus {
+      border-color: rgba(124,58,237,.45);
+      box-shadow: 0 0 0 4px rgba(124,58,237,.10);
+    }
+    .btn {
+      min-height: 46px;
+      border-radius: 15px;
+      border: 1px solid rgba(124,58,237,.10);
+      background: #fff;
+      font-weight: 800;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(92,45,145,.10); }
+    .btn-primary {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed 62%, #ec4899 140%);
+      border-color: rgba(124,58,237,.14);
+      color: white;
+      box-shadow: 0 18px 28px rgba(124,58,237,.18);
+    }
+    .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #7c3aed, #6d28d9 62%, #db2777 140%); }
+    .btn-soft { background: linear-gradient(180deg, #f8f3ff, #f1e9ff); border-color: rgba(124,58,237,.10); color: var(--accent-2); }
+    .location-help, .note { font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .checkbox-option {
+      gap: 12px; padding: 14px; border-radius: 16px;
+      border: 1px solid rgba(124,58,237,.12); background: linear-gradient(180deg, #fcfbff, #f6f1ff);
+    }
+    .checkbox-option input { margin-top: 2px; }
+    .logout-link { margin-top: 18px; display: inline-flex; font-weight: 700; color: var(--muted); }
+
+    .map-wrap, .route-summary-wrap, .below-map { grid-column: 2; min-width: 0; }
+    .map-wrap {
+      position: relative;
+      height: auto;
+      display: grid;
+      gap: 18px;
+      align-self: start;
+      padding: 0;
+      background: transparent;
+    }
+    .workspace-header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 22px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(255,255,255,.55);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .workspace-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .workspace-logo-mini {
+      width: 44px; height: 44px; border-radius: 16px; display: grid; place-items: center;
+      background: linear-gradient(135deg, rgba(236,72,153,.12), rgba(124,58,237,.16));
+      color: #7c3aed; font-size: 24px; border: 1px solid rgba(124,58,237,.10);
+    }
+    .workspace-brand-title { font-size: 18px; font-weight: 900; color: #201160; line-height: 1; }
+    .workspace-brand-subtitle { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .workspace-nav { display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .workspace-nav a {
+      text-decoration: none; color: #4a4271; font-weight: 800; font-size: 14px;
+      padding: 10px 14px; border-radius: 12px; transition: .18s ease;
+    }
+    .workspace-nav a.active { color: #6d28d9; background: rgba(124,58,237,.08); box-shadow: inset 0 -2px 0 #7c3aed; }
+    .workspace-nav a:hover { background: rgba(124,58,237,.05); }
+    .workspace-tools { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .workspace-search {
+      min-width: 260px; height: 46px; display: flex; align-items: center; gap: 10px;
+      padding: 0 14px; border-radius: 15px; background: rgba(246,242,255,.95);
+      border: 1px solid rgba(124,58,237,.10); color: var(--muted);
+    }
+    .workspace-search input { all: unset; width: 100%; font-size: 14px; color: #3a3158; }
+    .workspace-icon-btn, .workspace-avatar {
+      width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+      border: 1px solid rgba(124,58,237,.10); background: rgba(255,255,255,.92); box-shadow: var(--shadow-soft);
+    }
+    .workspace-avatar { overflow: hidden; font-size: 20px; }
+
+    .map-card {
+      position: relative;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(255,255,255,.6);
+      border-radius: 30px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    #map {
+      width: 100%; height: 360px;
+      border-radius: 24px;
+      box-shadow: inset 0 0 0 1px rgba(124,58,237,.08);
+      overflow: hidden;
+    }
+    .leaflet-top.leaflet-left { top: 14px; left: 14px; }
+    .leaflet-control-zoom a {
+      border: none !important;
+      color: #5f3ab7 !important;
+      background: rgba(255,255,255,.94) !important;
+      box-shadow: var(--shadow-soft);
+    }
+    .desktop-sidebar-toggle, .mobile-menu-btn, .undo-point-btn, .filter-panel {
+      box-shadow: var(--shadow-soft);
+    }
+    .desktop-sidebar-toggle {
+      top: 18px; left: 18px; z-index: 900;
+      width: 42px; height: 42px; border-radius: 14px; border: 1px solid rgba(124,58,237,.10);
+      background: rgba(255,255,255,.96); color: var(--accent);
+    }
+    .mobile-menu-btn {
+      top: 18px; left: 68px; min-height: 42px; border-radius: 14px;
+      border: 1px solid rgba(124,58,237,.10); background: rgba(255,255,255,.96);
+      color: #4f2da5; font-weight: 800;
+    }
+    .filter-panel {
+      right: 18px; bottom: 18px; width: 275px;
+      border-radius: 20px; border: 1px solid rgba(124,58,237,.10);
+      background: rgba(255,255,255,.92); backdrop-filter: blur(16px);
+    }
+    .filter-panel-head { border-radius: 18px; min-height: 56px; padding: 14px 16px; }
+    .filter-body { padding: 0 16px 16px; }
+    .poi-counts { margin-top: 10px; }
+    .pill { background: linear-gradient(180deg, #f9f6ff, #f3ecff); border-color: rgba(124,58,237,.10); }
+    .undo-point-btn {
+      right: 18px; bottom: 190px;
+      border-radius: 14px; border: 1px solid rgba(124,58,237,.10);
+      background: rgba(255,255,255,.96); color: #6d28d9;
+    }
+
+    .route-summary-wrap {
+      padding: 0; margin-top: 0;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(255,255,255,.58);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .route-summary-wrap .map-summary {
+      position: static; inset: auto;
+      max-width: none; padding: 26px; background: transparent; border: 0; box-shadow: none;
+    }
+    .route-summary-header {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 18px;
+    }
+    .route-headline { margin: 0; font-size: 24px; line-height: 1.1; letter-spacing: -.04em; color: #1f1558; }
+    .route-subline { margin-top: 6px; color: var(--muted); font-size: 14px; }
+    .route-overview-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .ghost-action-btn {
+      min-height: 44px; padding: 0 15px; border-radius: 14px; border: 1px solid rgba(124,58,237,.10);
+      background: rgba(255,255,255,.94); color: #412e80; font-weight: 800;
+    }
+    .ghost-action-btn.primary { background: linear-gradient(135deg, #8b5cf6, #7c3aed 62%, #ec4899 140%); color: white; border-color: transparent; }
+    .route-choices { margin-bottom: 18px; }
+    .route-choice {
+      border-radius: 18px; border: 1px solid rgba(124,58,237,.08);
+      background: linear-gradient(180deg, #fcfbff, #f6f1ff);
+      padding: 14px 16px; box-shadow: none;
+    }
+    .route-choice.active { border-color: rgba(124,58,237,.30); background: linear-gradient(180deg, #faf7ff, #f0e7ff); box-shadow: inset 0 0 0 1px rgba(124,58,237,.12); }
+    .map-summary-stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .summary-stat {
+      border-radius: 18px;
+      border: 1px solid rgba(124,58,237,.10);
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(246,241,255,.82));
+      padding: 18px 18px 16px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    .summary-stat strong { font-size: 20px; color: #251553; }
+    .summary-stat span { font-size: 13px; text-transform: none; letter-spacing: 0; margin-top: 4px; color: var(--muted); }
+
+    .below-map {
+      padding: 0;
+      background: transparent;
+      border: 0;
+      margin-top: 0;
+    }
+    .details-shell {
+      border-radius: 30px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(255,255,255,.58);
+      box-shadow: var(--shadow);
+      padding: 24px 26px 28px;
+    }
+    .details-head { margin-bottom: 18px; }
+    .details-kicker {
+      display: inline-flex; align-items: center; gap: 8px;
+      text-transform: uppercase; letter-spacing: .10em; font-size: 11px; font-weight: 900; color: #7c3aed;
+      background: rgba(124,58,237,.08); padding: 7px 10px; border-radius: 999px; margin-bottom: 12px;
+    }
+    .details-head h2 { margin: 0; font-size: 22px; letter-spacing: -.03em; color: #22174d; }
+    .details-head p { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+    .details-grid { display: grid; gap: 18px; }
+    .details-column { display: grid; gap: 18px; }
+    .detail-card, .elevation-panel, .roadtype-panel {
+      border-radius: 24px;
+      border: 1px solid rgba(124,58,237,.10);
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,243,255,.88));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+    }
+    .detail-card { padding: 20px; }
+    .detail-card-head { margin-bottom: 14px; }
+    .detail-card-title, .elevation-title, .roadtype-title { font-size: 20px; font-weight: 900; color: #241752; letter-spacing: -.03em; }
+    .detail-card-subtitle, .roadtype-subtitle, .elevation-meta { color: var(--muted); }
+    .gpx-map-btn { min-width: 220px; }
+    .elevation-panel { padding: 20px; }
+    .elevation-head, .roadtype-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .elevation-visuals { display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(280px, 1fr); gap: 16px; align-items: stretch; }
+    .elevation-chart-shell, .elevation-mini-map-shell {
+      border-radius: 20px; background: rgba(255,255,255,.88); border: 1px solid rgba(124,58,237,.09); padding: 16px;
+    }
+    .elevation-chart-shell::before {
+      content: 'Pentes > 3,5 %'; display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 800; color: #ff4d90; background: rgba(255,77,144,.08);
+      padding: 7px 10px; border-radius: 999px; margin-bottom: 12px;
+    }
+    .elevation-chart { width: 100%; height: 210px; }
+    .elevation-mini-map { width: 100%; height: 210px; border-radius: 16px; overflow: hidden; }
+    .elevation-insights {
+      margin-top: 14px; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px;
+    }
+    .insight-chip {
+      border-radius: 16px; padding: 12px 14px; background: rgba(255,255,255,.78); border: 1px solid rgba(124,58,237,.09);
+    }
+    .insight-chip strong { display: block; font-size: 17px; color: #251553; }
+    .insight-chip span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+
+    .roadtype-panel { padding: 20px; }
+    .roadtype-bars { display: grid; gap: 14px; }
+    .roadtype-stacked {
+      display: flex; overflow: hidden; height: 18px; border-radius: 999px; background: #ece4ff;
+      border: 1px solid rgba(124,58,237,.08);
+    }
+    .roadtype-stack-segment { height: 100%; }
+    .roadtype-legend-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    .roadtype-legend-item {
+      border-radius: 16px; padding: 14px; border: 1px solid rgba(124,58,237,.09); background: rgba(255,255,255,.78);
+      display: grid; gap: 6px;
+    }
+    .roadtype-legend-head { display: flex; align-items: center; gap: 8px; font-weight: 800; color: #2a1a56; }
+    .roadtype-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .roadtype-legend-item strong { font-size: 20px; color: #271758; }
+    .roadtype-legend-item small { color: var(--muted); font-size: 12px; }
+
+    .nutrition-launch-btn {
+      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 18px;
+      border-radius: 24px; border: 1px solid rgba(124,58,237,.10); padding: 22px;
+      background: linear-gradient(135deg, rgba(246,240,255,.98), rgba(255,245,251,.96)); color: inherit;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.65);
+    }
+    .nutrition-launch-copy { text-align: left; display: grid; gap: 4px; }
+    .nutrition-launch-kicker { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #8f83ac; font-weight: 900; }
+    .nutrition-launch-title { font-size: 22px; color: #241752; font-weight: 900; }
+    .nutrition-launch-subtitle { color: var(--muted); font-size: 14px; max-width: 520px; }
+    .nutrition-launch-arrow {
+      width: 54px; height: 54px; border-radius: 18px; display: grid; place-items: center; color: white;
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed 65%, #ec4899 135%); font-size: 22px;
+      box-shadow: 0 16px 28px rgba(124,58,237,.22);
+    }
+    .nutrition-launch-btn::after {
+      content: '🍌🥤'; font-size: 34px; grid-column: 2; grid-row: 1 / span 2; align-self: end; justify-self: end; margin-top: 28px;
+    }
+
+    .nutrition-modal-backdrop { background: rgba(29, 14, 58, .44); backdrop-filter: blur(8px); }
+    .nutrition-dialog {
+      border-radius: 28px; border: 1px solid rgba(255,255,255,.4);
+      background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,243,255,.96));
+      box-shadow: 0 30px 70px rgba(29,14,58,.24);
+    }
+
+    @media (max-width: 1200px) {
+      .workspace-header { grid-template-columns: 1fr; }
+      .workspace-nav { justify-content: flex-start; }
+      .workspace-tools { width: 100%; }
+      .workspace-search { flex: 1 1 auto; min-width: 0; }
+      .elevation-visuals { grid-template-columns: 1fr; }
+      .roadtype-legend-grid, .elevation-insights { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 960px) {
+      .app {
+        margin: 0; padding: 10px; gap: 12px;
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        position: fixed; inset: 0 auto 0 0; width: min(88vw, 360px); height: 100vh; top: 0;
+        border-radius: 0 24px 24px 0; z-index: 1500;
+        transform: translateX(-104%); transition: transform .22s ease;
+      }
+      .app.mobile-menu-open .sidebar { transform: translateX(0); }
+      .map-wrap, .route-summary-wrap, .below-map { grid-column: 1; }
+      .workspace-header {
+        grid-template-columns: 1fr auto; gap: 12px; padding: 16px;
+        border-radius: 24px;
+      }
+      .workspace-nav { grid-column: 1 / -1; justify-content: flex-start; overflow: auto; padding-bottom: 2px; }
+      .workspace-tools { grid-column: 1 / -1; }
+      .workspace-brand-subtitle { display: none; }
+      .map-card { padding: 10px; border-radius: 24px; }
+      #map { height: 50vh; min-height: 340px; border-radius: 18px; }
+      .desktop-sidebar-toggle { display: none; }
+      .mobile-menu-btn { display: inline-flex; }
+      .filter-panel { width: min(86vw, 290px); }
+      .route-summary-wrap .map-summary { padding: 18px; }
+      .route-summary-header { flex-direction: column; }
+      .map-summary-stats { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+      .details-shell { padding: 18px; border-radius: 24px; }
+      .nutrition-launch-btn { grid-template-columns: 1fr; }
+      .nutrition-launch-btn::after { grid-column: auto; grid-row: auto; justify-self: start; margin-top: 0; }
+    }
+    @media (max-width: 640px) {
+      .app { padding: 8px; }
+      .workspace-header { padding: 14px; border-radius: 20px; }
+      .workspace-brand-title { font-size: 16px; }
+      .workspace-search { min-width: 0; height: 42px; }
+      .workspace-icon-btn, .workspace-avatar { width: 40px; height: 40px; border-radius: 12px; }
+      .map-card { border-radius: 22px; }
+      #map { height: 52vh; min-height: 300px; }
+      .route-summary-wrap, .details-shell { border-radius: 22px; }
+      .summary-stat strong { font-size: 18px; }
+      .detail-card-title, .elevation-title, .roadtype-title, .nutrition-launch-title { font-size: 18px; }
+      .roadtype-legend-grid, .elevation-insights { grid-template-columns: 1fr; }
+      .workspace-tools { display: grid; grid-template-columns: minmax(0,1fr) auto auto; }
+      .workspace-avatar { display: none; }
+      .filter-panel { right: 10px; bottom: 10px; }
+      .undo-point-btn { right: 10px; bottom: 184px; }
+    }
+
+
+    /* ===== RouteVelo V44 design pass ===== */
+    :root {
+      --v44-bg-a:#fff8fd;
+      --v44-bg-b:#f7f2ff;
+      --v44-line:rgba(124,58,237,.10);
+      --v44-text:#20124d;
+      --v44-muted:#7a7191;
+      --v44-shadow:0 20px 50px rgba(109,40,217,.12);
+      --v44-shadow-soft:0 12px 28px rgba(76,29,149,.09);
+    }
+    body {
+      background:
+        radial-gradient(circle at 10% 0%, rgba(236,72,153,.12), transparent 22%),
+        radial-gradient(circle at 100% 10%, rgba(124,58,237,.10), transparent 28%),
+        linear-gradient(180deg, #f8f2ff 0%, #fbf7ff 45%, #f7f2ff 100%);
+      color: var(--v44-text);
+    }
+    .app {
+      max-width: 1500px;
+      padding: 18px;
+      gap: 18px;
+      grid-template-columns: minmax(300px, 338px) minmax(0, 1fr);
+    }
+    .sidebar {
+      position: sticky;
+      top: 18px;
+      min-height: calc(100vh - 36px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 18px 18px 22px;
+      border: 1px solid rgba(255,255,255,.66);
+      background: linear-gradient(180deg, rgba(255,255,255,.93), rgba(249,244,255,.92));
+      box-shadow: var(--v44-shadow);
+      overflow: hidden;
+    }
+    .sidebar::before {
+      content:""; position:absolute; inset:0 auto 0 0; width:72px;
+      background: linear-gradient(180deg, rgba(249,243,255,.88), rgba(242,236,255,.82));
+      border-right:1px solid rgba(124,58,237,.08);
+      z-index:0;
+    }
+    .sidebar > * { position:relative; z-index:1; }
+    .brand { padding-left: 70px; align-items:center; margin-bottom: 0; }
+    .brand-mark {
+      width: 46px; height: 46px; border-radius: 16px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 10px 22px rgba(124,58,237,.12);
+      color:#7c3aed;
+      font-size: 22px;
+    }
+    .sidebar-shortcuts {
+      position:absolute; top:112px; left:14px; display:flex; flex-direction:column; gap:12px; z-index:2;
+    }
+    .shortcut-chip {
+      width:44px; height:44px; display:grid; place-items:center; border-radius:15px;
+      border:1px solid rgba(124,58,237,.10); background:rgba(255,255,255,.86); color:#6d28d9;
+      box-shadow: var(--v44-shadow-soft); font-size:18px; transition:transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .shortcut-chip.active,
+    .shortcut-chip:hover { transform: translateY(-1px); background: linear-gradient(135deg, #f5ecff, #fdf6fb); }
+    .section, .logout-link, .hidden[aria-hidden="true"] { margin-left: 70px; }
+    .section-title { font-size: 22px; color:#241755; }
+    .workspace-header,
+    .map-card,
+    .route-summary-wrap,
+    .details-shell {
+      box-shadow: var(--v44-shadow);
+      border-color: rgba(255,255,255,.72);
+    }
+    .workspace-header {
+      padding: 16px 22px;
+      border-radius: 28px;
+      grid-template-columns: auto auto 1fr;
+      column-gap: 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,.93), rgba(250,245,255,.92));
+    }
+    .workspace-brand-title { font-size: 19px; }
+    .workspace-nav { justify-content: flex-start; gap: 10px; }
+    .workspace-nav a { padding: 12px 15px; font-size:15px; }
+    .workspace-nav a.active { background: rgba(124,58,237,.08); box-shadow: inset 0 -2px 0 #7c3aed; }
+    .workspace-tools { justify-content: flex-end; }
+    .workspace-search {
+      height: 48px; min-width: 330px; border-radius: 16px; background: rgba(247,242,255,.95);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+    }
+    .workspace-avatar { background: linear-gradient(135deg, rgba(139,92,246,.16), rgba(236,72,153,.16)); }
+    .map-card { padding: 12px; border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(251,247,255,.92)); }
+    #map { height: 390px; border-radius: 22px; }
+    .desktop-sidebar-toggle, .mobile-menu-btn, .filter-panel, .undo-point-btn,
+    .workspace-icon-btn, .workspace-avatar, .leaflet-control-zoom a {
+      box-shadow: var(--v44-shadow-soft) !important;
+    }
+    .route-summary-wrap { padding: 0; border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.93), rgba(249,243,255,.92)); }
+    .route-summary-wrap .map-summary { padding: 24px; }
+    .route-summary-header { margin-bottom: 20px; }
+    .route-headline { font-size: 34px; font-weight: 900; letter-spacing: -.045em; }
+    .route-subline { font-size: 14px; }
+    .route-overview-actions { gap: 12px; }
+    .ghost-action-btn { min-height: 46px; border-radius: 15px; padding: 0 16px; }
+    .map-summary-stats { gap: 16px; }
+    .summary-stat {
+      position: relative; padding: 16px 18px 14px 18px; border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,243,255,.86));
+    }
+    .summary-stat::before {
+      content:""; position:absolute; width:44px; height:44px; border-radius:14px; top:14px; left:14px;
+      background: linear-gradient(135deg, rgba(124,58,237,.12), rgba(236,72,153,.12));
+    }
+    .summary-stat strong,
+    .summary-stat span { position: relative; z-index:1; padding-left: 56px; display:block; }
+    .summary-stat strong { font-size: 28px; line-height:1.1; }
+    .summary-stat span { margin-top: 6px; }
+    .details-shell { padding: 26px; border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(248,242,255,.92)); }
+    .details-head { margin-bottom: 22px; }
+    .details-kicker { margin-bottom: 14px; }
+    .details-grid-v44 {
+      display: grid;
+      grid-template-columns: minmax(0, 1.75fr) minmax(300px, .85fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .details-main-col, .details-side-col { display:grid; gap:18px; }
+    .detail-card, .elevation-panel, .roadtype-panel, .nutrition-launch-btn {
+      border-radius: 24px;
+      border: 1px solid var(--v44-line);
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(249,244,255,.9));
+      box-shadow: var(--v44-shadow-soft);
+    }
+    .download-card { min-height: 150px; display:flex; flex-direction:column; justify-content:space-between; }
+    .gpx-map-btn { width: 100%; min-height: 50px; }
+    .elevation-head, .roadtype-head { margin-bottom: 18px; }
+    .elevation-title, .roadtype-title, .detail-card-title, .nutrition-launch-title { font-size: 22px; }
+    .elevation-visuals { grid-template-columns: minmax(0, 1.6fr) minmax(260px, .9fr); gap:18px; }
+    .elevation-chart-shell, .elevation-mini-map-shell {
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(249,244,255,.86));
+      border: 1px solid rgba(124,58,237,.08);
+      padding: 16px;
+    }
+    .position-card-head { margin-bottom: 12px; }
+    .position-card-title { font-size: 18px; font-weight: 800; color:#241752; }
+    .position-card-subtitle { font-size: 13px; color: var(--v44-muted); margin-top: 4px; }
+    .elevation-chart { height: 230px; }
+    .elevation-mini-map { height: 230px; }
+    .elevation-insights { gap: 12px; }
+    .insight-chip { padding: 14px 14px 12px; border-radius: 18px; background: rgba(255,255,255,.82); }
+    .roadtype-stacked { height: 20px; }
+    .roadtype-legend-grid { gap: 12px; }
+    .roadtype-legend-item { padding: 15px 14px; border-radius: 18px; }
+    .nutrition-launch-btn {
+      min-height: 205px; padding: 24px; text-align:left; align-items:flex-start;
+      background:
+        radial-gradient(circle at top right, rgba(236,72,153,.14), transparent 22%),
+        linear-gradient(180deg, rgba(248,242,255,.98), rgba(255,247,251,.94));
+    }
+    .nutrition-launch-kicker { color:#8d83a8; }
+    .nutrition-launch-title { font-size: 26px; }
+    .nutrition-launch-subtitle { max-width: 320px; font-size: 14px; }
+    .nutrition-launch-arrow { align-self:flex-end; justify-self:end; margin-left:auto; }
+    .nutrition-launch-btn::after { content:"🍌🥤"; font-size: 40px; position:absolute; right:20px; bottom:18px; }
+    .route-choice {
+      border-radius:16px; padding: 14px 15px;
+      background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(247,241,255,.84));
+    }
+    .route-choice.active { box-shadow: inset 0 0 0 1px rgba(124,58,237,.22), 0 12px 24px rgba(124,58,237,.08); }
+    .filter-panel { border-radius: 22px; }
+    .filter-panel-head { min-height: 58px; }
+    .toggle-row { padding: 12px 0; }
+    .pill { border-radius: 999px; }
+    .nutrition-dialog { border-radius: 30px; }
+    .desktop-sidebar-collapsed .sidebar::before,
+    .desktop-sidebar-collapsed .sidebar-shortcuts,
+    .desktop-sidebar-collapsed .section,
+    .desktop-sidebar-collapsed .logout-link,
+    .desktop-sidebar-collapsed .brand > div:last-child,
+    .desktop-sidebar-collapsed .section-title,
+    .desktop-sidebar-collapsed .stack,
+    .desktop-sidebar-collapsed .segmented,
+    .desktop-sidebar-collapsed #calculateBtn,
+    .desktop-sidebar-collapsed .hidden[aria-hidden="true"] {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .desktop-sidebar-collapsed .sidebar { width: 92px; min-width:92px; padding-left:14px; padding-right:14px; }
+    .desktop-sidebar-collapsed .brand { padding-left: 0; justify-content:center; }
+    .desktop-sidebar-collapsed .sidebar-shortcuts { opacity: 1; pointer-events:auto; left:24px; top:104px; }
+    .desktop-sidebar-collapsed .brand-mark { margin: 0 auto; }
+    .desktop-sidebar-collapsed .logout-link { display:none; }
+    @media (max-width: 1200px) {
+      .details-grid-v44 { grid-template-columns: 1fr; }
+      .details-side-col { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .workspace-header { grid-template-columns: auto 1fr; }
+      .workspace-nav { grid-column: 1 / -1; }
+    }
+    @media (max-width: 960px) {
+      .app { grid-template-columns: 1fr; padding: 10px; }
+      .sidebar::before, .sidebar-shortcuts { display:none; }
+      .brand, .section, .logout-link, .hidden[aria-hidden="true"] { margin-left: 0; padding-left: 0; }
+      .workspace-header { grid-template-columns: 1fr; row-gap: 12px; }
+      .workspace-tools { width: 100%; }
+      .workspace-search { min-width: 0; flex:1 1 auto; }
+      .route-headline { font-size: 26px; }
+      .summary-stat::before { width:36px; height:36px; top:12px; left:12px; border-radius:12px; }
+      .summary-stat strong, .summary-stat span { padding-left: 48px; }
+      .details-side-col { grid-template-columns: 1fr; }
+      #map { height: 46vh; min-height: 320px; }
+    }
+    @media (max-width: 640px) {
+      .app { padding: 8px; }
+      .workspace-nav { gap: 6px; }
+      .workspace-nav a { padding: 10px 12px; font-size: 14px; }
+      .route-summary-wrap .map-summary { padding: 18px; }
+      .map-summary-stats { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+      .summary-stat strong { font-size: 20px; }
+      .summary-stat strong, .summary-stat span { padding-left: 0; }
+      .summary-stat::before { display:none; }
+      .details-shell { padding: 18px; }
+      .elevation-visuals { grid-template-columns: 1fr; }
+      .elevation-chart, .elevation-mini-map { height: 205px; }
+      .nutrition-launch-btn { min-height: 160px; padding: 20px; }
+      .nutrition-launch-title { font-size: 22px; }
+      .download-card { min-height: auto; }
+    }
+
   </style>
 </head>
 <body>
@@ -1354,36 +1997,74 @@
     <div id="mobileOverlay" class="mobile-overlay" aria-hidden="true"></div>
 
     <section class="map-wrap">
-      <button id="desktopSidebarToggle" class="desktop-sidebar-toggle" type="button" aria-label="Rétracter le menu" aria-expanded="true">←</button>
-      <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Ouvrir les réglages">☰ Itinéraire</button>
-      <div id="map" aria-label="Carte de planification d’itinéraire"></div>
-      <aside id="filterPanel" class="filter-panel collapsed" aria-label="Filtres de la carte">
-        <button id="filterToggleBtn" class="filter-panel-head" type="button" aria-expanded="false" aria-controls="filterBody">
-          <span><strong>Filtres</strong><small>Points utiles sur le trajet</small></span>
-          <span id="filterChevron" class="filter-chevron" aria-hidden="true">+</span>
-        </button>
-        <div id="filterBody" class="filter-body">
-          <div class="toggle-row">
-            <div class="toggle-label"><span class="poi-symbol">💧</span><span>Points d’eau + cimetières<br><small>jusqu’à 400 m · cache serveur local</small></span></div>
-            <label class="switch"><input id="waterToggle" type="checkbox" checked /><span class="slider"></span></label>
+      <header class="workspace-header" aria-label="Navigation principale RouteVelo">
+        <div class="workspace-brand">
+          <div class="workspace-logo-mini">🚴</div>
+          <div>
+            <div class="workspace-brand-title">RouteVelo</div>
+            <div class="workspace-brand-subtitle">Planification vélo de route premium</div>
           </div>
-          <div class="toggle-row">
-            <div class="toggle-label"><span class="poi-symbol">🥐</span><span>Boulangeries<br><small>jusqu’à 400 m · cache serveur local</small></span></div>
-            <label class="switch"><input id="bakeryToggle" type="checkbox" checked /><span class="slider"></span></label>
-          </div>
-          <div class="poi-counts"><span id="waterCount" class="pill">0 point d’eau</span><span id="bakeryCount" class="pill">0 boulangerie</span></div>
         </div>
-      </aside>
-      <button id="undoPointBtn" class="undo-point-btn" type="button" disabled aria-label="Annuler le dernier point ajouté">↶ Annuler le point</button>
+        <nav class="workspace-nav" aria-label="Navigation">
+          <a href="#" class="active">Planifier</a>
+          <a href="#">Mes parcours</a>
+          <a href="#">Explorer</a>
+          <a href="#">Communauté</a>
+        </nav>
+        <div class="workspace-tools">
+          <label class="workspace-search" aria-label="Recherche rapide">
+            <span aria-hidden="true">🔎</span>
+            <input type="text" placeholder="Rechercher un lieu, une ville…" />
+          </label>
+          <button class="workspace-icon-btn" type="button" aria-label="Notifications">🔔</button>
+          <div class="workspace-avatar" aria-hidden="true">👤</div>
+        </div>
+      </header>
+
+      <div class="map-card">
+        <button id="desktopSidebarToggle" class="desktop-sidebar-toggle" type="button" aria-label="Rétracter le menu" aria-expanded="true">←</button>
+        <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Ouvrir les réglages">☰ Itinéraire</button>
+        <div id="map" aria-label="Carte de planification d’itinéraire"></div>
+        <aside id="filterPanel" class="filter-panel collapsed" aria-label="Filtres de la carte">
+          <button id="filterToggleBtn" class="filter-panel-head" type="button" aria-expanded="false" aria-controls="filterBody">
+            <span><strong>Filtres</strong><small>Points utiles sur le trajet</small></span>
+            <span id="filterChevron" class="filter-chevron" aria-hidden="true">+</span>
+          </button>
+          <div id="filterBody" class="filter-body">
+            <div class="toggle-row">
+              <div class="toggle-label"><span class="poi-symbol">💧</span><span>Points d’eau + cimetières<br><small>jusqu’à 400 m · cache serveur local</small></span></div>
+              <label class="switch"><input id="waterToggle" type="checkbox" checked /><span class="slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-label"><span class="poi-symbol">🥐</span><span>Boulangeries<br><small>jusqu’à 400 m · cache serveur local</small></span></div>
+              <label class="switch"><input id="bakeryToggle" type="checkbox" checked /><span class="slider"></span></label>
+            </div>
+            <div class="poi-counts"><span id="waterCount" class="pill">0 point d’eau</span><span id="bakeryCount" class="pill">0 boulangerie</span></div>
+          </div>
+        </aside>
+        <button id="undoPointBtn" class="undo-point-btn" type="button" disabled aria-label="Annuler le dernier point ajouté">↶ Annuler le point</button>
+      </div>
     </section>
 
     <section class="route-summary-wrap" aria-label="Résumé du parcours">
       <div class="map-summary" aria-live="polite">
+        <div class="route-summary-header">
+          <div>
+            <h2 id="routeHeadline" class="route-headline">Mon parcours RouteVelo</h2>
+            <div id="routeSubline" class="route-subline">Calcule un itinéraire pour afficher le résumé complet, le profil d’élévation et le plan nutritionnel.</div>
+          </div>
+          <div class="route-overview-actions" aria-label="Actions du parcours">
+            <button class="ghost-action-btn" type="button">♡ Enregistrer</button>
+            <button class="ghost-action-btn" type="button">↗ Partager</button>
+            <button class="ghost-action-btn" type="button">⋯</button>
+            <button class="ghost-action-btn primary" type="button">✎ Modifier ce parcours</button>
+          </div>
+        </div>
         <div id="routeChoices" class="route-choices hidden" aria-label="Choix de l’itinéraire"></div>
         <div class="map-summary-main">
           <div class="map-summary-stats">
             <div class="summary-stat"><strong id="distanceStat">—</strong><span>Distance</span></div>
-            <div class="summary-stat"><strong id="timeStat">—</strong><span>Temps</span></div>
+            <div class="summary-stat"><strong id="timeStat">—</strong><span>Temps estimé</span></div>
             <div class="summary-stat"><strong id="ascendStat">—</strong><span>D+</span></div>
             <div class="summary-stat"><strong id="descendStat">—</strong><span>D−</span></div>
           </div>
@@ -1394,19 +2075,12 @@
     <section id="routeDetails" class="below-map" aria-label="Détails du parcours">
       <div class="details-shell">
         <div class="details-head">
-          <div class="details-kicker">Après la carte</div>
+          <div class="details-kicker">Détails premium</div>
           <h2>Détails du parcours</h2>
-          <p>Fais défiler la page : le bas de la carte reste volontairement compact, et toutes les informations détaillées sont ici.</p>
+          <p>Profil d’élévation interactif, mini-carte synchronisée, répartition des types de route et plan nutritionnel personnalisé.</p>
         </div>
-        <div class="details-grid">
-          <div class="details-column">
-            <div class="detail-card download-card">
-              <div class="detail-card-head">
-                <div><div class="detail-card-title">GPX</div><div class="detail-card-subtitle">Exporte le tracé actuellement sélectionné.</div></div>
-              </div>
-              <button id="gpxBtn" class="btn btn-primary gpx-map-btn" type="button" disabled>Télécharger GPX</button>
-            </div>
-
+        <div class="details-grid details-grid-v44">
+          <div class="details-column details-main-col">
             <div id="elevationPanel" class="elevation-panel hidden" aria-label="Profil d’élévation du parcours">
               <div class="elevation-head">
                 <span class="elevation-title">Profil d’élévation</span>
@@ -1424,9 +2098,16 @@
                   </svg>
                 </div>
                 <div class="elevation-mini-map-shell">
+                  <div class="position-card-head">
+                    <div>
+                      <div class="position-card-title">Position sur la carte</div>
+                      <div class="position-card-subtitle">Le point rouge suit le profil et le tracé.</div>
+                    </div>
+                  </div>
                   <div id="elevationMiniMap" class="elevation-mini-map" aria-label="Carte du parcours synchronisée avec le profil d’élévation"></div>
                 </div>
               </div>
+              <div id="elevationInsights" class="elevation-insights"></div>
             </div>
 
             <div id="roadTypePanel" class="roadtype-panel hidden" aria-label="Répartition des types de voie">
@@ -1435,6 +2116,15 @@
                 <span class="roadtype-subtitle">couleurs appliquées au tracé</span>
               </div>
               <div id="roadTypeBars" class="roadtype-bars"></div>
+            </div>
+          </div>
+
+          <aside class="details-column details-side-col">
+            <div class="detail-card download-card">
+              <div class="detail-card-head">
+                <div><div class="detail-card-title">GPX</div><div class="detail-card-subtitle">Exporte le tracé actuellement sélectionné.</div></div>
+              </div>
+              <button id="gpxBtn" class="btn btn-primary gpx-map-btn" type="button" disabled>Télécharger GPX</button>
             </div>
 
             <button id="nutritionOpenBtn" class="nutrition-launch-btn" type="button" aria-haspopup="dialog" aria-controls="nutritionModal">
@@ -1445,7 +2135,7 @@
               </span>
               <span class="nutrition-launch-arrow" aria-hidden="true">→</span>
             </button>
-          </div>
+          </aside>
         </div>
       </div>
     </section>
@@ -1562,7 +2252,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V42
+      // RouteVelo V44
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1603,6 +2293,7 @@
         elevationChart: document.getElementById('elevationChart'),
         elevationMeta: document.getElementById('elevationMeta'),
         elevationMiniMap: document.getElementById('elevationMiniMap'),
+        elevationInsights: document.getElementById('elevationInsights'),
         roadTypePanel: document.getElementById('roadTypePanel'),
         roadTypeBars: document.getElementById('roadTypeBars'),
         undoPointBtn: document.getElementById('undoPointBtn'),
@@ -1789,6 +2480,7 @@
         if (els.elevationChart) {
           els.elevationChart.innerHTML = `<defs><linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop><stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop></linearGradient></defs>`;
         }
+        if (els.elevationInsights) els.elevationInsights.innerHTML = '';
       }
 
       function elevationSlopePercent(points, index) {
@@ -1915,6 +2607,21 @@
         const initialX = x(initial.km);
         const initialY = y(initial.h);
         els.elevationChart.innerHTML = `<defs><linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#db2777" stop-opacity="0.38"></stop><stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"></stop></linearGradient></defs>${grid}<line class="elevation-baseline" x1="${left}" y1="${baseY}" x2="${W-right}" y2="${baseY}"></line><path class="elevation-area" d="${areaPath}"></path><polyline class="elevation-line" points="${linePoints}"></polyline>${steepSegments}<g id="elevationCursor"><line id="elevationCursorLine" class="elevation-cursor-line" x1="${initialX.toFixed(1)}" y1="${top}" x2="${initialX.toFixed(1)}" y2="${top + plotH}"></line><circle id="elevationCursorDot" class="elevation-cursor-dot" cx="${initialX.toFixed(1)}" cy="${initialY.toFixed(1)}" r="4.7"></circle><circle id="elevationCursorHandle" class="elevation-cursor-handle" cx="${initialX.toFixed(1)}" cy="${top + 3}" r="4.4"></circle><rect id="elevationCursorLabelBg" class="elevation-cursor-label-bg" x="${left + 5}" y="${top + 5}" width="126" height="17" rx="6"></rect><text id="elevationCursorLabel" class="elevation-cursor-label" x="${left + 12}" y="${top + 17}">0 km · ${Math.round(initial.h)} m · 0%</text></g>`;
+        const slopes = points.map((_, idx) => elevationSlopePercent(points, idx));
+        const maxSlope = Math.max(...slopes.map(v => Math.abs(v)), 0);
+        let steepKm = 0;
+        for (let i = 1; i < points.length; i++) {
+          const avgSlope = Math.abs((elevationSlopePercent(points, i - 1) + elevationSlopePercent(points, i)) / 2);
+          if (avgSlope >= 3.5) steepKm += Math.max(0, points[i].km - points[i - 1].km);
+        }
+        if (els.elevationInsights) {
+          els.elevationInsights.innerHTML = `
+            <div class="insight-chip"><strong>${Math.round(rawMin)} m</strong><span>Altitude min</span></div>
+            <div class="insight-chip"><strong>${Math.round(rawMax)} m</strong><span>Altitude max</span></div>
+            <div class="insight-chip"><strong>${maxSlope.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}%</strong><span>Pente max</span></div>
+            <div class="insight-chip"><strong>${steepKm.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km</strong><span>Pentes &gt; 3,5 %</span></div>
+          `;
+        }
         els.elevationMeta.textContent = `Pentes ≥ 3,5 % en rouge · ${Math.round(rawMin)}–${Math.round(rawMax)} m`;
         els.elevationPanel.classList.remove('hidden');
         syncElevationMiniRoute(state.routeCoords);
@@ -1993,15 +2700,20 @@
           total += weight;
         }
         if (!(total > 0)) return;
-        const palette = { 'Route':'#7c3aed', 'Piste cyclable':'#16a34a', 'Voie de service':'#f59e0b', 'Autre':'#64748b' };
+        const palette = { 'Route':'#7c3aed', 'Piste cyclable':'#16a34a', 'Voie de service':'#f59e0b', 'Autre':'#94a3b8' };
         const rows = [...groups.entries()]
-          .map(([label, value]) => ({ label, pct: value / total * 100 }))
-          .filter(item => item.pct >= 0.5)
+          .map(([label, value]) => ({ label, value, pct: value / total * 100, km: value / 1000 }))
+          .filter(item => item.pct >= 0.4)
           .sort((a, b) => b.pct - a.pct);
-        els.roadTypeBars.innerHTML = rows.map(item => {
-          const pct = Math.round(item.pct);
-          return `<div class="roadtype-row"><span class="roadtype-label">${item.label}</span><span class="roadtype-track"><span class="roadtype-fill" style="width:${Math.max(1, item.pct).toFixed(1)}%;background:${palette[item.label] || '#94a3b8'}"></span></span><span class="roadtype-value">${pct}%</span></div>`;
-        }).join('');
+        const stack = rows.map(item => `<span class="roadtype-stack-segment" style="width:${Math.max(item.pct, 1).toFixed(1)}%;background:${palette[item.label] || '#94a3b8'}"></span>`).join('');
+        const legend = rows.map(item => `
+          <div class="roadtype-legend-item">
+            <div class="roadtype-legend-head"><span class="roadtype-dot" style="background:${palette[item.label] || '#94a3b8'}"></span>${item.label}</div>
+            <strong>${Math.round(item.pct)}%</strong>
+            <small>${item.km.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km</small>
+          </div>
+        `).join('');
+        els.roadTypeBars.innerHTML = `<div class="roadtype-stacked">${stack}</div><div class="roadtype-legend-grid">${legend}</div>`;
         els.roadTypePanel.classList.toggle('hidden', !rows.length);
       }
 
@@ -2414,6 +3126,33 @@
         state.markers.forEach(marker => marker.setZIndexOffset(1200));
       }
 
+      function routeTitleText() {
+        if (state.mode === 'loop') {
+          const base = (els.loopSearch?.value || '').trim() || 'ma position';
+          return `Boucle autour de ${base}`;
+        }
+        const start = (els.startSearch?.value || '').trim() || 'Départ';
+        const end = (els.endSearch?.value || '').trim() || 'Arrivée';
+        if (els.returnToStart?.checked) return `${start} → ${end} → ${start}`;
+        return `${start} → ${end}`;
+      }
+
+      function routeSubtitleText(route = null) {
+        const now = new Date();
+        const date = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+        if (route && Number(route.distance) > 0) {
+          return `Créé le ${date} · ${fmtKm(route.distance)} · ${fmtTime(route.time || 0)}`;
+        }
+        return `Prépare ton parcours avec l’interface RouteVelo inspirée de la maquette premium.`;
+      }
+
+      function syncRouteHeader(route = null) {
+        const titleEl = document.getElementById('routeHeadline');
+        const subEl = document.getElementById('routeSubline');
+        if (titleEl) titleEl.textContent = routeTitleText();
+        if (subEl) subEl.textContent = routeSubtitleText(route);
+      }
+
       function resetStats() {
         els.distanceStat.textContent = '—';
         els.timeStat.textContent = '—';
@@ -2434,6 +3173,7 @@
       function clearRouteChoices() {
         state.routeOptions = [];
         state.selectedRouteOption = -1;
+        syncRouteHeader();
         els.routeChoices.innerHTML = '';
         els.routeChoices.classList.add('hidden');
       }
@@ -3113,6 +3853,7 @@
         resetElevationProfile();
         resetRoadTypeBreakdown();
         state.currentRoute = { distance: Number(route.distance) || 0, time: Number(route.time) || 0 };
+        syncRouteHeader(state.currentRoute);
         updateNutritionAvailability();
         if (state.nutritionPlanActive) generateNutritionPlan();
         else resetNutritionPlan({ keepActive: true });
@@ -4670,6 +5411,7 @@
         requestAnimationFrame(() => map.invalidateSize(false));
       }
 
+      syncRouteHeader();
       const routeSummaryWrap = document.querySelector('.route-summary-wrap');
       if (routeSummaryWrap && 'ResizeObserver' in window) {
         const desktopHomeObserver = new ResizeObserver(syncDesktopHomeHeight);
