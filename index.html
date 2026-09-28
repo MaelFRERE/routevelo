@@ -1090,6 +1090,16 @@
       .nutrition-carry-summary, .nutrition-plan-summary { font-size:11px; }
     }
 
+  
+
+    /* V41 - keep desktop route details below the initial viewport. */
+    @media (min-width: 851px) {
+      .map-wrap {
+        height: var(--routevelo-home-map-h, calc(100vh - 150px));
+        max-height: none;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1364,7 +1374,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V40
+      // RouteVelo V41
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -4210,6 +4220,28 @@
           generateABOptions();
         });
       });
+
+
+      function syncDesktopHomeHeight() {
+        if (window.innerWidth <= 850) {
+          document.documentElement.style.removeProperty('--routevelo-home-map-h');
+          requestAnimationFrame(() => map.invalidateSize(false));
+          return;
+        }
+        const summary = document.querySelector('.route-summary-wrap');
+        const summaryH = summary ? Math.ceil(summary.getBoundingClientRect().height) : 0;
+        const target = Math.max(500, Math.floor(window.innerHeight - summaryH - 3));
+        document.documentElement.style.setProperty('--routevelo-home-map-h', `${target}px`);
+        requestAnimationFrame(() => map.invalidateSize(false));
+      }
+
+      const routeSummaryWrap = document.querySelector('.route-summary-wrap');
+      if (routeSummaryWrap && 'ResizeObserver' in window) {
+        const desktopHomeObserver = new ResizeObserver(syncDesktopHomeHeight);
+        desktopHomeObserver.observe(routeSummaryWrap);
+      }
+      window.addEventListener('resize', syncDesktopHomeHeight, { passive: true });
+      requestAnimationFrame(syncDesktopHomeHeight);
       els.loopSearch.addEventListener('keydown', e => {
         if (e.key !== 'Enter') return;
         closeMobilePanel();

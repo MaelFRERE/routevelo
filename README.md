@@ -1,4 +1,4 @@
-# RouteVelo V40
+# RouteVelo V41
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -268,3 +268,11 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - `POI_DB_PATH` permet de placer la base sur un disque persistant. Sur un hébergement à système de fichiers éphémère, la base peut être recréée après un redéploiement/redémarrage complet.
 - Le filtrage final reste strict à **400 m du tracé réel** côté navigateur.
 
+
+
+## V41 : accueil PC plein ecran
+
+- Sur ordinateur, la carte et le resume Court/Moyen/Long + Distance/Temps/D+/D- occupent ensemble le premier ecran.
+- La section Details du parcours commence juste sous la ligne de flottaison : elle n'apparait plus au bas de la page d'accueil sur PC.
+- La hauteur se recalcule automatiquement si le resume change ou si la fenetre est redimensionnee.
+- Sur mobile, le comportement reste volontairement deroulant : les details restent accessibles en faisant defiler la page sous la carte et le resume.
