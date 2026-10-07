@@ -1,4 +1,4 @@
-# RouteVelo V42.1
+# RouteVelo V42.2
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -296,3 +296,14 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - La recherche A→B retombe sur un trajet simple si la recherche d’alternatives échoue.
 - Les détours internes utilisés pour fabriquer des alternatives ne deviennent plus de faux points utilisateur.
 - Second hôte Valhalla en secours pour les erreurs réseau temporaires.
+
+## V42.2 : correction A→B et points manuels
+
+- Calcul A→B prioritaire sur un trajet direct : le tracé apparaît avant la recherche des variantes.
+- Suppression de la génération lente de détours artificiels pour compléter absolument 3 variantes.
+- Premier clic carte = départ et deuxième clic = arrivée lorsqu’aucun A→B n’est encore affiché.
+- Après calcul, un clic sur la carte ajoute un point intermédiaire et recalcule le trajet.
+- Points intermédiaires envoyés à Valhalla comme `through` pour éviter les demi-tours parasites.
+- Rayon de corrélation augmenté autour des points géocodés pour trouver une route cyclable valide.
+- Géocodage IGN/Géoplateforme prioritaire en France, avec Nominatim en secours.
+- Profil vélo de route envoyé en `bicycle_type: road` selon l’API Valhalla actuelle.

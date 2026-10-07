@@ -85,6 +85,7 @@ class RateGate:
 
 valhalla_gate = RateGate(1.08)
 nominatim_gate = RateGate(1.08)
+ign_geocode_gate = RateGate(0.06)
 business_gate = RateGate(0.17)  # API Recherche d'entreprises: 7 appels/s max
 
 
@@ -349,7 +350,7 @@ def post_valhalla(endpoint: str, payload):
                 method="POST",
                 payload=payload,
                 headers={"X-Client-Id": CLIENT_ID, "User-Agent": USER_AGENT},
-                timeout=60,
+                timeout=28 if endpoint == "/route" else 60,
             )[0]
         except RuntimeError as exc:
             last_error = exc
@@ -1665,7 +1666,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/health":
-            return self.send_json({"status": "ok", "version": "42.1", "poi_cache": local_poi_store.stats()})
+            return self.send_json({"status": "ok", "version": "42.2", "poi_cache": local_poi_store.stats()})
         if parsed.path == "/login":
             if self._is_authenticated():
                 return self._redirect("/")
@@ -1726,10 +1727,49 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
         if len(q) > 220:
             return self.send_error_json("Recherche trop longue.", 400)
         try:
-            cache_key = ("geocode-v25", unicodedata.normalize("NFKC", q).strip().casefold())
+            cache_key = ("geocode-v42.2", unicodedata.normalize("NFKC", q).strip().casefold())
             cached = _cache_get(cache_key)
             if cached is not None:
                 return self.send_json(cached)
+
+            # V42.2 : la Géoplateforme/IGN est prioritaire en France. Elle est
+            # beaucoup moins restrictive en débit que Nominatim et évite que le
+            # calcul A→B dépende de deux recherches OSM espacées d'une seconde.
+            ign_error = None
+            try:
+                ign_geocode_gate.wait()
+                ign_query = urllib.parse.urlencode({
+                    "q": q,
+                    "limit": 1,
+                    "returntruegeometry": "false",
+                })
+                data, _ = upstream_json(
+                    IGN_GEOCODER + "/search?" + ign_query,
+                    headers={"User-Agent": USER_AGENT},
+                    timeout=12,
+                )
+                features = data.get("features") if isinstance(data, dict) else None
+                if features:
+                    feature = features[0]
+                    geometry = feature.get("geometry") or {}
+                    coords = geometry.get("coordinates") or []
+                    props = feature.get("properties") or {}
+                    if len(coords) >= 2:
+                        result = {
+                            "lat": float(coords[1]),
+                            "lng": float(coords[0]),
+                            "label": props.get("label") or props.get("name") or q,
+                            "source": "ign",
+                        }
+                        _cache_put(cache_key, result)
+                        return self.send_json(result)
+            except RuntimeError as exc:
+                ign_error = exc
+            except Exception:
+                ign_error = RuntimeError("Géocodage IGN indisponible.")
+
+            # Secours mondial OSM/Nominatim si l'IGN ne connaît pas le lieu ou
+            # connaît une panne temporaire.
             nominatim_gate.wait()
             query = urllib.parse.urlencode({
                 "q": q,
@@ -1741,15 +1781,18 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             data, _ = upstream_json(
                 NOMINATIM + "/search?" + query,
                 headers={"User-Agent": USER_AGENT, "Referer": f"http://{HOST}:{self.server.server_port}/"},
-                timeout=30,
+                timeout=18,
             )
             if not data:
+                if ign_error:
+                    return self.send_error_json("Adresse introuvable avec les deux géocodeurs.", 404)
                 return self.send_error_json("Adresse introuvable.", 404)
             hit = data[0]
             result = {
                 "lat": float(hit["lat"]),
                 "lng": float(hit["lon"]),
                 "label": hit.get("display_name") or q,
+                "source": "nominatim",
             }
             _cache_put(cache_key, result)
             return self.send_json(result)

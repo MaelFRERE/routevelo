@@ -1,13 +1,13 @@
 <!doctype html>
-<!-- RouteVelo V42.1 -->
+<!-- RouteVelo V42.2 -->
 <html lang="fr">
 <head>
-  <!-- RouteVelo V42.1 -->
+  <!-- RouteVelo V42.2 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="42.1" />
+  <meta name="routevelo-version" content="42.2" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -1291,7 +1291,8 @@
 
     /* V42.1 — correction édition manuelle A→B */
     .manual-point-help { margin-top:2px; padding:9px 10px; border:1px dashed #dfcff5; border-radius:10px; background:#fbf8ff; color:#6f6680; line-height:1.4; }
-    #map.route-edit-ready { cursor: crosshair; }
+    #map.route-edit-ready, #map.ab-point-placement { cursor: crosshair; }
+    #map.ab-point-placement::after { content:"1er clic : départ · 2e clic : arrivée"; position:absolute; z-index:650; left:50%; top:12px; transform:translateX(-50%); pointer-events:none; padding:7px 10px; border-radius:999px; background:rgba(255,255,255,.94); border:1px solid #dfcff5; color:#5b21b6; font-size:11px; font-weight:800; box-shadow:0 8px 20px rgba(76,29,149,.10); }
     .waypoint-marker.is-new { animation: waypointNewPulse .52s ease both; }
     @keyframes waypointNewPulse {
       0% { transform: scale(.72); box-shadow:0 0 0 0 rgba(219,39,119,.34); }
@@ -1351,7 +1352,7 @@
         </div>
 
         <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer 3 itinéraires</button>
-        <div id="manualPointHelp" class="note manual-point-help">Après avoir choisi un trajet, clique directement sur la carte pour ajouter un point de passage. Tu peux aussi déplacer les points numérotés.</div>
+        <div id="manualPointHelp" class="note manual-point-help"><strong>Points à la main :</strong> avant le calcul, le 1er clic sur la carte place le départ et le 2e place l’arrivée. Après le calcul, clique sur la carte pour ajouter un point de passage, ou déplace un point numéroté.</div>
       </section>
 
       <a class="logout-link" href="/logout">Se déconnecter</a>
@@ -1574,10 +1575,12 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V42.1
+      // RouteVelo V42.2
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
+      const AB_MAP_START_LABEL = 'Départ placé sur la carte';
+      const AB_MAP_END_LABEL = 'Arrivée placée sur la carte';
       const ALLOWED_USES = new Set(['road', 'ramp', 'turn_channel', 'cycleway', 'culdesac', 'service_road']);
       const ALLOWED_SURFACES = new Set(['paved_smooth', 'paved']);
 
@@ -2459,6 +2462,7 @@
         els.loopControls.classList.toggle('hidden', mode !== 'loop');
         els.calculateBtn.classList.toggle('hidden', mode !== 'ab');
         clearAll();
+        updateABMapPlacementHint();
       }
 
       function markerIcon(i) {
@@ -2607,10 +2611,58 @@
         }
       }
 
+      function updateABMapPlacementHint() {
+        const mapEl = document.getElementById('map');
+        if (!mapEl) return;
+        const readyForEndpoints = state.mode === 'ab' && !state.routeLayer && !state.routeCoords.length;
+        mapEl.classList.toggle('ab-point-placement', readyForEndpoints);
+        mapEl.classList.toggle('route-edit-ready', !!state.routeLayer && !!state.routeCoords.length);
+      }
+
+      function existingABEndpoint(kind) {
+        if (!state.waypoints.length) return null;
+        return kind === 'start' ? state.waypoints[0] : state.waypoints[state.waypoints.length - 1];
+      }
+
+      function placeABEndpointFromMap(latlng) {
+        const wp = { lat: Number(latlng.lat), lng: Number(latlng.lng), source: 'map' };
+        if (!Number.isFinite(wp.lat) || !Number.isFinite(wp.lng)) return;
+
+        // S'il restait deux points d'une tentative qui a échoué, un nouveau clic
+        // redémarre proprement le placement manuel depuis le départ.
+        if (state.waypoints.length >= 2) {
+          rememberWaypoints();
+          state.waypoints = [wp];
+          els.startSearch.value = AB_MAP_START_LABEL;
+          els.endSearch.value = '';
+          refreshWaypointMarkers();
+          clearRouteOnly();
+          updateABMapPlacementHint();
+          setStatus('Départ placé. Clique maintenant sur la carte pour placer l’arrivée.', 'ok');
+          return;
+        }
+
+        rememberWaypoints();
+        if (state.waypoints.length === 0) {
+          state.waypoints = [wp];
+          els.startSearch.value = AB_MAP_START_LABEL;
+          refreshWaypointMarkers();
+          updateABMapPlacementHint();
+          setStatus('Départ placé. Clique maintenant sur la carte pour placer l’arrivée.', 'ok');
+          return;
+        }
+
+        state.waypoints.push(wp);
+        els.endSearch.value = AB_MAP_END_LABEL;
+        refreshWaypointMarkers();
+        updateABMapPlacementHint();
+        setStatus('Arrivée placée. Calcul de l’itinéraire…');
+        generateABOptions({ baseWaypointsOverride: cloneWaypoints(state.waypoints) }).catch(() => {});
+      }
+
       function clearRouteOnly() {
         clearLoopPreviews();
         state.manualEditInProgress = false;
-        document.getElementById('map')?.classList.remove('route-edit-ready');
         if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
         clearRouteTypeOverlay();
         state.poiLayers.water.clearLayers();
@@ -2629,6 +2681,7 @@
         resetStats();
         clearRouteChoices();
         setStatus('Aucun itinéraire calculé.');
+        updateABMapPlacementHint();
       }
 
       function clearAll() {
@@ -2731,6 +2784,10 @@
       // Apres calcul, un clic sur la carte ajoute un point de passage et modifie le trace.
       // Pendant l'aperçu des 3 boucles, on attend d'abord que l'utilisateur en choisisse une.
       map.on('click', e => {
+        if (state.mode === 'ab' && (!state.routeLayer || !state.routeCoords.length)) {
+          placeABEndpointFromMap(e.latlng);
+          return;
+        }
         if (state.mode === 'loop' && state.loopPreviewLayer && state.selectedRouteOption < 0) return;
         if (!state.routeLayer || !state.routeCoords.length) return;
         addPoint(e.latlng);
@@ -2855,7 +2912,7 @@
 
       function bicycleCosting() {
         return {
-          bicycle_type: 'Road',
+          bicycle_type: 'road',
           cycling_speed: 25,
           use_roads: 0.72,
           use_hills: 0.5,
@@ -2869,15 +2926,26 @@
       }
 
       function requestLocations(waypoints = state.waypoints, loop = state.mode === 'loop') {
-        const points = waypoints.map(p => ({ lat: p.lat, lon: p.lng, type: 'break' }));
-        if (loop && points.length > 1) {
-          const first = points[0];
-          const last = points[points.length - 1];
+        const raw = waypoints.map(p => ({ lat: Number(p.lat), lon: Number(p.lng) }));
+        if (loop && raw.length > 1) {
+          const first = raw[0];
+          const last = raw[raw.length - 1];
           if (haversineM({ lat: first.lat, lng: first.lon }, { lat: last.lat, lng: last.lon }) > 20) {
-            points.push({ lat: first.lat, lon: first.lon, type: 'break' });
+            raw.push({ lat: first.lat, lon: first.lon });
           }
         }
-        return points;
+        return raw.map((p, index) => ({
+          lat: p.lat,
+          lon: p.lon,
+          // Les points intermédiaires servent à modeler la route sans autoriser
+          // un demi-tour parasite. Les extrémités restent de vrais breaks.
+          type: index === 0 || index === raw.length - 1 ? 'break' : 'through',
+          // Un géocodage de ville tombe parfois sur une place/piétonnier : on
+          // laisse Valhalla choisir une route cyclable valable autour du point.
+          radius: 200,
+          minimum_reachability: 5,
+          rank_candidates: true
+        }));
       }
 
       function decodePolyline6(encoded) {
@@ -3061,7 +3129,7 @@
       }
 
       function cloneWaypoints(points) {
-        return points.map(p => ({ lat: p.lat, lng: p.lng, ...(p.label ? { label: p.label } : {}) }));
+        return points.map(p => ({ lat: p.lat, lng: p.lng, ...(p.label ? { label: p.label } : {}), ...(p.source ? { source: p.source } : {}) }));
       }
 
       function distinctRoutes(routes) {
@@ -3085,7 +3153,7 @@
           locations: requestLocations(waypoints, loop),
           costing: 'bicycle',
           costing_options: { bicycle: costing },
-          directions_type: 'none',
+          units: 'kilometers',
           directions_options: { units: 'kilometers', language: 'fr-FR' },
           shape_format: 'polyline6'
         };
@@ -3140,7 +3208,7 @@
         routeMain.bringToFront();
         snapWaypointMarkersToRoute();
         state.manualEditInProgress = false;
-        document.getElementById('map')?.classList.add('route-edit-ready');
+        updateABMapPlacementHint();
         map.fitBounds(state.routeLayer.getBounds(), { padding: [42, 42], maxZoom: 16 });
         els.distanceStat.textContent = fmtKm(route.distance);
         els.timeStat.textContent = fmtTime(route.time);
@@ -3609,17 +3677,27 @@
         return els.returnToStart && els.returnToStart.checked ? 'Calculer 3 allers-retours' : 'Calculer 3 itinéraires';
       }
 
+      async function resolveABEndpoint(kind, query) {
+        const existing = existingABEndpoint(kind);
+        if (kind === 'start' && query === 'Ma position' && state.currentLocation) {
+          return { lat: state.currentLocation.lat, lng: state.currentLocation.lng, label: 'Ma position', source: 'gps' };
+        }
+        if (kind === 'start' && query === AB_MAP_START_LABEL && existing) return { ...existing, source: 'map' };
+        if (kind === 'end' && query === AB_MAP_END_LABEL && existing) return { ...existing, source: 'map' };
+        return geocode(query);
+      }
+
       async function resolveABEndpoints() {
         const startQuery = els.startSearch.value.trim();
         const endQuery = els.endSearch.value.trim();
-        if (!startQuery) throw new Error('Saisissez une ville ou une adresse de départ.');
-        if (!endQuery) throw new Error('Saisissez une ville ou une adresse d’arrivée.');
+        if (!startQuery) throw new Error('Saisissez un départ ou clique une première fois sur la carte.');
+        if (!endQuery) throw new Error('Saisissez une arrivée ou clique une deuxième fois sur la carte.');
 
         setStatus('Recherche du départ et de l’arrivée…');
-        const startPromise = startQuery === 'Ma position' && state.currentLocation
-          ? Promise.resolve({ lat: state.currentLocation.lat, lng: state.currentLocation.lng, label: 'Ma position' })
-          : geocode(startQuery);
-        const [start, end] = await Promise.all([startPromise, geocode(endQuery)]);
+        const [start, end] = await Promise.all([
+          resolveABEndpoint('start', startQuery),
+          resolveABEndpoint('end', endQuery)
+        ]);
 
         rememberWaypoints();
         state.waypoints = [start, end];
@@ -3627,71 +3705,81 @@
         return cloneWaypoints(state.waypoints);
       }
 
-      async function generateABOptions({ silent = false } = {}) {
+      async function generateABOptions({ silent = false, baseWaypointsOverride = null } = {}) {
         if (state.mode !== 'ab') return false;
         let baseWaypoints;
         try {
-          baseWaypoints = await resolveABEndpoints();
+          baseWaypoints = Array.isArray(baseWaypointsOverride) && baseWaypointsOverride.length >= 2
+            ? cloneWaypoints(baseWaypointsOverride)
+            : await resolveABEndpoints();
+          // Pour un A→B normal, on ne garde que les extrémités lors d'un nouveau
+          // calcul depuis les champs. Les points intermédiaires sont réservés à
+          // l'édition manuelle du tracé déjà affiché.
+          if (!(els.returnToStart && els.returnToStart.checked) && baseWaypoints.length > 2 && !baseWaypointsOverride) {
+            baseWaypoints = [baseWaypoints[0], baseWaypoints[baseWaypoints.length - 1]];
+            state.waypoints = cloneWaypoints(baseWaypoints);
+            refreshWaypointMarkers();
+          }
         } catch (err) {
           setStatus(err.message || 'Impossible de trouver le départ ou l’arrivée.', 'error');
           return false;
         }
+
         const serial = ++state.requestSerial;
-        if (!silent) setBusy(els.calculateBtn, true, 'Recherche…');
+        if (!silent) setBusy(els.calculateBtn, true, 'Calcul…');
         const roundTrip = !!(els.returnToStart && els.returnToStart.checked);
-        setStatus(roundTrip ? 'Recherche de 3 allers-retours avec retour différent…' : 'Recherche de 3 itinéraires vélo de route…');
+        setStatus(roundTrip ? 'Recherche de 3 allers-retours avec retour différent…' : 'Calcul de l’itinéraire vélo de route…');
+
         try {
-          let routes;
+          let routes = [];
           if (roundTrip) {
             routes = await generateABRoundTripRoutes(serial, baseWaypoints);
           } else {
-            try {
-              routes = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 });
-            } catch (_) {
-              // Le serveur public peut parfois refuser/limiter la recherche
-              // d'alternatives alors qu'un trajet simple fonctionne encore.
-              const direct = await fetchSingleRoute(serial, { waypoints: baseWaypoints, loop: false });
-              routes = [direct];
-            }
-            routes.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
-            routes = distinctRoutes(routes);
+            // Priorité absolue à un trajet qui s'affiche vite et fonctionne :
+            // on demande d'abord UNE route simple. L'ancienne version attendait
+            // plusieurs détours artificiels avant de montrer quoi que ce soit.
+            const direct = await fetchSingleRoute(serial, { waypoints: baseWaypoints, loop: false });
+            direct.waypoints = cloneWaypoints(baseWaypoints);
+            direct.label = 'Itinéraire';
+            routes = [direct];
 
-            // Certains serveurs ou certaines zones renvoient moins de 3 alternatives.
-            // Dans ce cas, on construit des détours routables progressifs puis on trie par distance réelle.
-            if (routes.length < 3 && baseWaypoints.length === 2) {
-              const patterns = [
-                [0.10, 1], [0.10, -1], [0.18, 1], [0.18, -1], [0.28, 1], [0.28, -1]
-              ];
-              for (const [factor, side] of patterns) {
-                if (routes.length >= 3) break;
-                const detourWaypoints = buildABDetourWaypoints(baseWaypoints[0], baseWaypoints[1], factor, side);
-                try {
-                  const route = await fetchSingleRoute(serial, { waypoints: detourWaypoints, loop: false });
-                  // Les points de détour servent uniquement à fabriquer une
-                  // alternative. Ils ne doivent pas apparaître comme des points
-                  // ajoutés par l'utilisateur, sinon l'édition manuelle devient incohérente.
-                  route.waypoints = cloneWaypoints(baseWaypoints);
-                  routes = distinctRoutes([...routes, route]);
-                } catch (_) {}
-              }
+            if (serial !== state.requestSerial) return false;
+            state.routeOptions = [direct];
+            state.selectedRouteOption = 0;
+            renderRouteChoices();
+            renderRoute(direct);
+            setStatus('Itinéraire trouvé. Recherche des variantes…', 'ok');
+
+            // Une seule requête d'alternatives Valhalla, uniquement entre A et B.
+            // Si elle échoue ou n'en fournit pas, le trajet direct reste utilisable.
+            try {
+              const alternates = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 });
+              alternates.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
+              routes = distinctRoutes([direct, ...alternates]);
+            } catch (altErr) {
+              if (String(altErr.message || '').includes('remplacée')) return false;
+              routes = [direct];
             }
           }
 
+          if (serial !== state.requestSerial) return false;
           const chosen = chooseThreeByDistance(routes);
-          if (!chosen.length) throw new Error('Aucun itinéraire routable trouvé.');
+          if (!chosen.length) throw new Error('Aucun itinéraire routable trouvé. Essaie de placer le départ et l’arrivée directement sur une route avec la carte.');
           setRouteOptions(chosen);
           if (chosen.length < 3) {
-            setStatus(`${chosen.length} proposition${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Le réseau local n’a pas fourni 3 tracés distincts.`, 'warn');
+            setStatus(`${chosen.length} proposition${chosen.length > 1 ? 's' : ''} disponible${chosen.length > 1 ? 's' : ''}. Le trajet est prêt ; le serveur n’a simplement pas fourni 3 variantes distinctes.`, chosen.length ? 'ok' : 'warn');
           }
           return true;
         } catch (err) {
-          if (String(err.message).includes('remplacée')) return false;
+          if (String(err.message || '').includes('remplacée')) return false;
           if (serial === state.requestSerial) {
             if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
             clearRouteTypeOverlay();
             resetStats();
             clearRouteChoices();
-            setStatus(err.message || 'Impossible de calculer les itinéraires.', 'error');
+            updateABMapPlacementHint();
+            const msg = err.message || 'Impossible de calculer l’itinéraire.';
+            setStatus(`${msg} Tu peux aussi placer le départ puis l’arrivée directement sur la carte.`, 'error');
           }
           return false;
         } finally {
@@ -4722,6 +4810,7 @@
       }
       window.addEventListener('resize', syncDesktopHomeHeight, { passive: true });
       requestAnimationFrame(syncDesktopHomeHeight);
+      updateABMapPlacementHint();
       els.loopSearch.addEventListener('keydown', e => {
         if (e.key !== 'Enter') return;
         closeMobilePanel();
