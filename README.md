@@ -297,13 +297,9 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - Les détours internes utilisés pour fabriquer des alternatives ne deviennent plus de faux points utilisateur.
 - Second hôte Valhalla en secours pour les erreurs réseau temporaires.
 
-## V42.2 : correction A→B et points manuels
 
-- Calcul A→B prioritaire sur un trajet direct : le tracé apparaît avant la recherche des variantes.
-- Suppression de la génération lente de détours artificiels pour compléter absolument 3 variantes.
-- Premier clic carte = départ et deuxième clic = arrivée lorsqu’aucun A→B n’est encore affiché.
-- Après calcul, un clic sur la carte ajoute un point intermédiaire et recalcule le trajet.
-- Points intermédiaires envoyés à Valhalla comme `through` pour éviter les demi-tours parasites.
-- Rayon de corrélation augmenté autour des points géocodés pour trouver une route cyclable valide.
-- Géocodage IGN/Géoplateforme prioritaire en France, avec Nominatim en secours.
-- Profil vélo de route envoyé en `bicycle_type: road` selon l’API Valhalla actuelle.
+## V42.2 - ordre des points + A→B fiabilisé
+
+- Chaque clic manuel ajoute toujours le point suivant à la fin : après le point 5, le prochain est toujours le point 6, même si le clic est proche du point 1.
+- Suppression de l'insertion automatique basée sur la proximité du tracé pour les nouveaux clics.
+- Le calcul A→B tente désormais le trajet direct en premier ; les alternatives sont ajoutées ensuite et ne peuvent plus bloquer le trajet principal.
