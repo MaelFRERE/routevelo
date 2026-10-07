@@ -1,4 +1,4 @@
-# RouteVelo V42
+# RouteVelo V42.1
 
 Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
@@ -285,3 +285,14 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - Les points de passage numérotés sont projetés visuellement sur la ligne du trajet après chaque calcul/recalcul.
 - Les boulangeries ouvrent une mini-fiche enrichie avec état ouvert/fermé lorsque les horaires OSM sont interprétables, horaires du jour, adresse, téléphone/site si disponibles et bouton Google Maps. Les détails manquants sont chargés uniquement au clic puis mis en cache côté serveur.
 - Refonte visuelle complète conservant la palette violet/rose : cartes plus nettes, hiérarchie améliorée, champs et boutons modernisés, ombres plus douces, micro-animations et adaptation mobile.
+
+
+## V42.1 - correction A→B et points manuels
+
+- Les points déplacés sont recalculés à partir de leur vraie position au lieu de relancer le géocodage des anciens champs.
+- Un clic sur la carte après sélection d’un trajet ajoute un point de passage visible immédiatement.
+- Les points sont recollés au nouveau tracé seulement après un recalcul réussi.
+- Un échec de recalcul ne supprime plus l’ancien trajet.
+- La recherche A→B retombe sur un trajet simple si la recherche d’alternatives échoue.
+- Les détours internes utilisés pour fabriquer des alternatives ne deviennent plus de faux points utilisateur.
+- Second hôte Valhalla en secours pour les erreurs réseau temporaires.

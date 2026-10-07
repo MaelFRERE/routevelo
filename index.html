@@ -1,13 +1,13 @@
 <!doctype html>
-<!-- RouteVelo V34 -->
+<!-- RouteVelo V42.1 -->
 <html lang="fr">
 <head>
-  <!-- RouteVelo V26 -->
+  <!-- RouteVelo V42.1 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - planificateur vélo de route</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="34" />
+  <meta name="routevelo-version" content="42.1" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -1288,6 +1288,17 @@
       .route-choice:hover, .btn:hover:not(:disabled), .nutrition-launch-btn:hover, .desktop-sidebar-toggle:hover { transform:none; }
     }
 
+
+    /* V42.1 — correction édition manuelle A→B */
+    .manual-point-help { margin-top:2px; padding:9px 10px; border:1px dashed #dfcff5; border-radius:10px; background:#fbf8ff; color:#6f6680; line-height:1.4; }
+    #map.route-edit-ready { cursor: crosshair; }
+    .waypoint-marker.is-new { animation: waypointNewPulse .52s ease both; }
+    @keyframes waypointNewPulse {
+      0% { transform: scale(.72); box-shadow:0 0 0 0 rgba(219,39,119,.34); }
+      55% { transform: scale(1.16); box-shadow:0 0 0 10px rgba(219,39,119,0); }
+      100% { transform: scale(1); }
+    }
+
   </style>
 </head>
 <body>
@@ -1340,6 +1351,7 @@
         </div>
 
         <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer 3 itinéraires</button>
+        <div id="manualPointHelp" class="note manual-point-help">Après avoir choisi un trajet, clique directement sur la carte pour ajouter un point de passage. Tu peux aussi déplacer les points numérotés.</div>
       </section>
 
       <a class="logout-link" href="/logout">Se déconnecter</a>
@@ -1562,7 +1574,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V42
+      // RouteVelo V42.1
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1683,6 +1695,7 @@
         poiCache: new Map(),
         loopSeed: 0,
         recalcTimer: null,
+        manualEditInProgress: false,
         requestSerial: 0
       };
 
@@ -2540,9 +2553,12 @@
         state.markers.forEach(m => map.removeLayer(m));
         state.markers = [];
         state.waypoints.forEach((wp, i) => {
-          const displayWp = state.routeCoords.length ? nearestPointOnRoute(wp) : wp;
-          const marker = L.marker([displayWp.lat, displayWp.lng], { draggable: true, icon: markerIcon(i), autoPan: true }).addTo(map);
+          // Pendant une édition, le marqueur doit rester exactement là où
+          // l'utilisateur l'a posé. Il ne sera recollé au NOUVEAU tracé
+          // qu'une fois le recalcul terminé avec succès.
+          const marker = L.marker([wp.lat, wp.lng], { draggable: true, icon: markerIcon(i), autoPan: true }).addTo(map);
           marker.on('dragstart', () => {
+            state.manualEditInProgress = true;
             marker.setZIndexOffset(2500);
             animateWaypointSelected(marker, true);
           });
@@ -2551,9 +2567,11 @@
             const p = marker.getLatLng();
             rememberWaypoints();
             state.waypoints[i] = { lat: p.lat, lng: p.lng };
+            state.manualEditInProgress = true;
             renderWaypointList();
-            marker.setZIndexOffset(0);
+            marker.setZIndexOffset(2500);
             animateWaypointDropped(marker);
+            setStatus('Point déplacé. Recalcul du trajet…');
             scheduleRecalc();
           });
           marker.on('click', () => {
@@ -2591,6 +2609,8 @@
 
       function clearRouteOnly() {
         clearLoopPreviews();
+        state.manualEditInProgress = false;
+        document.getElementById('map')?.classList.remove('route-edit-ready');
         if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
         clearRouteTypeOverlay();
         state.poiLayers.water.clearLayers();
@@ -2667,7 +2687,15 @@
           rememberWaypoints();
           const insertAt = insertionIndexForRoutePoint(wp);
           state.waypoints.splice(insertAt, 0, wp);
+          state.manualEditInProgress = true;
           refreshWaypointMarkers();
+          const addedMarker = state.markers[insertAt];
+          const node = waypointMarkerNode(addedMarker);
+          if (node) {
+            node.classList.add('is-new', 'is-selected');
+            setTimeout(() => node.classList.remove('is-new', 'is-selected'), 620);
+          }
+          setStatus(`Point ${insertAt + 1} ajouté. Recalcul du trajet…`);
           scheduleRecalc();
           return;
         }
@@ -2686,12 +2714,18 @@
         clearTimeout(state.recalcTimer);
         state.recalcTimer = setTimeout(() => {
           if (!canRoute()) return;
-          if (state.mode === 'ab' && state.waypoints.length === 2) {
+          // Dès qu'un tracé existe (ou qu'un point vient d'être manipulé),
+          // on recalcule à partir des coordonnées réellement présentes sur
+          // la carte. L'ancienne V42 relançait le géocodage avec seulement
+          // 2 points et pouvait donc annuler un déplacement manuel.
+          if (state.routeLayer || state.routeCoords.length || state.manualEditInProgress || state.waypoints.length > 2) {
+            recalculateEditedRoute().catch(() => {});
+          } else if (state.mode === 'ab') {
             generateABOptions({ silent: true }).catch(() => {});
           } else {
             recalculateEditedRoute().catch(() => {});
           }
-        }, 450);
+        }, 260);
       }
 
       // Apres calcul, un clic sur la carte ajoute un point de passage et modifie le trace.
@@ -3105,6 +3139,8 @@
         state.routeLayer = L.featureGroup([routeOutline, routeMain]).addTo(map);
         routeMain.bringToFront();
         snapWaypointMarkersToRoute();
+        state.manualEditInProgress = false;
+        document.getElementById('map')?.classList.add('route-edit-ready');
         map.fitBounds(state.routeLayer.getBounds(), { padding: [42, 42], maxZoom: 16 });
         els.distanceStat.textContent = fmtKm(route.distance);
         els.timeStat.textContent = fmtTime(route.time);
@@ -3385,10 +3421,9 @@
         } catch (err) {
           if (String(err.message).includes('remplacée')) return false;
           if (serial === state.requestSerial) {
-            if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
-            clearRouteTypeOverlay();
-            resetStats();
-            setStatus(err.message || 'Impossible de recalculer cet itinéraire.', 'error');
+            // On conserve l'ancien tracé à l'écran : l'utilisateur peut
+            // déplacer à nouveau le point ou utiliser Annuler sans tout perdre.
+            setStatus((err.message || 'Impossible de recalculer cet itinéraire.') + ' L’ancien tracé reste affiché.', 'error');
           }
           return false;
         }
@@ -3581,10 +3616,10 @@
         if (!endQuery) throw new Error('Saisissez une ville ou une adresse d’arrivée.');
 
         setStatus('Recherche du départ et de l’arrivée…');
-        const start = startQuery === 'Ma position' && state.currentLocation
-          ? { lat: state.currentLocation.lat, lng: state.currentLocation.lng, label: 'Ma position' }
-          : await geocode(startQuery);
-        const end = await geocode(endQuery);
+        const startPromise = startQuery === 'Ma position' && state.currentLocation
+          ? Promise.resolve({ lat: state.currentLocation.lat, lng: state.currentLocation.lng, label: 'Ma position' })
+          : geocode(startQuery);
+        const [start, end] = await Promise.all([startPromise, geocode(endQuery)]);
 
         rememberWaypoints();
         state.waypoints = [start, end];
@@ -3610,7 +3645,14 @@
           if (roundTrip) {
             routes = await generateABRoundTripRoutes(serial, baseWaypoints);
           } else {
-            routes = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 });
+            try {
+              routes = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 });
+            } catch (_) {
+              // Le serveur public peut parfois refuser/limiter la recherche
+              // d'alternatives alors qu'un trajet simple fonctionne encore.
+              const direct = await fetchSingleRoute(serial, { waypoints: baseWaypoints, loop: false });
+              routes = [direct];
+            }
             routes.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
             routes = distinctRoutes(routes);
 
@@ -3625,7 +3667,10 @@
                 const detourWaypoints = buildABDetourWaypoints(baseWaypoints[0], baseWaypoints[1], factor, side);
                 try {
                   const route = await fetchSingleRoute(serial, { waypoints: detourWaypoints, loop: false });
-                  route.waypoints = cloneWaypoints(detourWaypoints);
+                  // Les points de détour servent uniquement à fabriquer une
+                  // alternative. Ils ne doivent pas apparaître comme des points
+                  // ajoutés par l'utilisateur, sinon l'édition manuelle devient incohérente.
+                  route.waypoints = cloneWaypoints(baseWaypoints);
                   routes = distinctRoutes([...routes, route]);
                 } catch (_) {}
               }

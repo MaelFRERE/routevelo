@@ -31,7 +31,11 @@ PORT = int(PORT_ENV or "8080")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "").strip()
 AUTH_SECRET = os.environ.get("AUTH_SECRET", "").strip() or os.urandom(32).hex()
 AUTH_COOKIE = "routevelo_auth"
-VALHALLA = "https://valhalla1.openstreetmap.de"
+VALHALLA_ENDPOINTS = [
+    "https://valhalla1.openstreetmap.de",
+    "https://valhalla.openstreetmap.de",
+]
+VALHALLA = VALHALLA_ENDPOINTS[0]
 NOMINATIM = "https://nominatim.openstreetmap.org"
 BUSINESS_API = "https://recherche-entreprises.api.gouv.fr"
 IGN_GEOCODER = "https://data.geopf.fr/geocodage"
@@ -331,14 +335,30 @@ def upstream_json(url: str, method: str = "GET", payload=None, headers=None, tim
 
 
 def post_valhalla(endpoint: str, payload):
-    valhalla_gate.wait()
-    return upstream_json(
-        VALHALLA + endpoint,
-        method="POST",
-        payload=payload,
-        headers={"X-Client-Id": CLIENT_ID, "User-Agent": USER_AGENT},
-        timeout=60,
-    )[0]
+    """Call the public FOSSGIS Valhalla service with a second host fallback.
+
+    Both hosts expose the same public demo service. The fallback is useful for
+    short transient gateway/DNS failures and does not change routing semantics.
+    """
+    last_error = None
+    for base in VALHALLA_ENDPOINTS:
+        valhalla_gate.wait()
+        try:
+            return upstream_json(
+                base + endpoint,
+                method="POST",
+                payload=payload,
+                headers={"X-Client-Id": CLIENT_ID, "User-Agent": USER_AGENT},
+                timeout=60,
+            )[0]
+        except RuntimeError as exc:
+            last_error = exc
+            # A genuine routing answer such as "No path" will be the same on
+            # both hosts; do not double-load the public service for that case.
+            msg = str(exc).lower()
+            if "no path" in msg or "aucun chemin" in msg or "400" in msg:
+                break
+    raise last_error or RuntimeError("Service Valhalla indisponible.")
 
 
 def read_json(handler: BaseHTTPRequestHandler, max_bytes: int = 2_000_000):
@@ -1645,7 +1665,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/health":
-            return self.send_json({"status": "ok", "version": "42", "poi_cache": local_poi_store.stats()})
+            return self.send_json({"status": "ok", "version": "42.1", "poi_cache": local_poi_store.stats()})
         if parsed.path == "/login":
             if self._is_authenticated():
                 return self._redirect("/")
