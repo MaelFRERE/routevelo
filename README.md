@@ -1,22 +1,6 @@
-# RouteVelo V45
+# VéloRun V45 — vélo de route & course à pied
 
-Planificateur d'itinéraires **vélo de route et course à pied** avec écran de choix de l'activité, trajets A → B, allers-retours, boucles et export GPX. Le projet est basé sur la V42.1 corrigée, sans le design V43/V44.
-
-
-## V45 — maintenance générale et course à pied
-
-- **Écran d’accueil** : choix entre vélo de route et course à pied. Le bouton « Choisir une autre activité » revient à l'accueil et réinitialise la planification.
-- **Vélo** : les paramètres `bicycle_type=Road`, `avoid_bad_surfaces=1`, `use_tracks=0` restent appliqués. Points d'eau/cimetières, boulangeries, informations de revêtement, profil d'altitude et nutrition restent réservés au vélo.
-- **Course à pied** : routage Valhalla `pedestrian` qui accepte les chemins forestiers, sentiers et pistes praticables à pied. Vitesse de référence pour l'estimation : 8,5 km/h. A → B, case « Faire un aller-retour », ou boucle de 2 à 80 km. Interface simplifiée : distance, durée, choix de trajet et export GPX ; sans plan nutritionnel, sans D+/D− ni ventilation du type de route.
-- **Réparation A → B** : première réponse routable affichée tout de suite ; les alternatives sont facultatives et n'empêchent jamais d'utiliser le premier tracé. Une erreur d'adresse ou de routage apparaît désormais en clair dans la barre latérale et sur la carte, y compris sur téléphone.
-- **Points manuels** : un clic sur la carte peut poser le départ, puis l'arrivée, sans géocodage. Les clics suivants ajoutent les passages chronologiquement : D, 1, 2, 3, etc., puis A en fin de parcours. Le point 6 garde le numéro 6 même s'il est géographiquement près du point 1. Le tracé est recalculé sans perdre les points. L'annulation et le déplacement restent disponibles.
-- **Géocodage** : recherche Nominatim avec repli automatique sur le service IGN (sans clé). L'adresse saisie n'est pas recherchée une nouvelle fois si elle correspond déjà à un point géolocalisé, notamment après déplacement manuel.
-- **Synchronisation** : les anciens résultats d'API ne remplacent plus un nouveau trajet, une édition manuelle ou un changement d'activité ; le GPX reste disponible dès qu'un itinéraire est affiché.
-- **Cache POI** : cache local SQLite inchangé pour le vélo ; fichiers transitoires exclus du ZIP.
-
-**Déploiement :** envoyer les fichiers contenus dans `velo-route-planner/` à la racine du dépôt GitHub relié à Render. Ne pas recopier les anciens fichiers `routevelo_pois.sqlite3`, `*.sqlite3-wal`, `*.sqlite3-shm` ou `__pycache__`.
-
-**Services externes :** le routage dépend des serveurs publics Valhalla et du réseau OpenStreetMap. Les tests hors ligne vérifient la logique et les deux profils avec des réponses simulées ; la disponibilité du service public ne peut pas être garantie. Le réglage piéton autorise les sentiers OSM accessibles, mais ne crée pas de chemins absents de la carte.
+Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
 
 ## Utilisation locale
 
@@ -312,3 +296,17 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - La recherche A→B retombe sur un trajet simple si la recherche d’alternatives échoue.
 - Les détours internes utilisés pour fabriquer des alternatives ne deviennent plus de faux points utilisateur.
 - Second hôte Valhalla en secours pour les erreurs réseau temporaires.
+
+
+## V45 — Bilan, corrections et course à pied
+
+- Accueil plein écran : deux cartes « Vélo de route » et « Course à pied », sans scroll.
+- Nouveau nom et logo VéloRun ; couleur violette pour le vélo, rose pour le run. Le même code serveur/API fonctionne pour les deux activités.
+- Course à pied : A → B, option aller-retour et boucles (2 à 70 km), Valhalla `pedestrian` pour autoriser sentiers, chemins forestiers et non-revêtus. Temps estimé : allure indicative de 6 min/km.
+- Course à pied : distance, temps, GPX et points utiles ; profil nutritionnel, D+/D− et types de voies masqués.
+- Vélo : Valhalla `bicycle` de type `Road`, surfaces à éviter, types de route colorés, altitude/D+/D−, nutrition et GPX préservés.
+- A → B : d'abord calcul direct sans alternatives pour garantir un itinéraire affiché dès que le moteur répond ; alternatives recherchées ensuite seulement, sans bloquer. Secours de géocodage IGN.
+- Points manuels : chaque clic ajoute un numéro à la fin, sans insertion au milieu, et recalcul. Deux clics suffisent pour poser le départ et l'arrivée depuis la carte.
+- Message d'état visible en couleur juste à côté du bouton « Itinéraire » sur la carte.
+- Déploiement inchangé : mêmes `server.py`, `render.yaml`, `requirements.txt` et `start.*`. La variable `APP_PASSWORD` reste valable.
+- Pas de clé API payante. Les calculs et POI nécessitent toujours l'accès aux services OpenStreetMap/Valhalla lors d'un premier passage.

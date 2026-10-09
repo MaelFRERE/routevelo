@@ -1,13 +1,13 @@
 <!doctype html>
-<!-- RouteVelo V45 -->
+<!-- VéloRun V45 -->
 <html lang="fr">
 <head>
-  <!-- RouteVelo V42.1 -->
+  <!-- VéloRun V45 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>RouteVelo - vélo de route et course à pied</title>
+  <title>VéloRun — parcours vélo et course à pied</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="45" />
+  <meta name="routevelo-version" content="42.1" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -1301,128 +1301,94 @@
 
 
 
-
-    /* V45 : écran d'accueil et mode course à pied, sans refonte du thème V42. */
-    body.activity-home-open { overflow:hidden; max-height:100dvh; }
-    .activity-home {
-      position: fixed; inset: 0; z-index: 3000; overflow-y: auto;
-      display: grid; place-items: center; padding: 36px 18px;
-      background: linear-gradient(135deg, #f6f0ff 0%, #fff5fb 55%, #f3edff 100%);
-      isolation: isolate;
+    /* V45 — VéloRun : accueil deux sports, 0 défilement, modes distincts */
+    body.sport-home-active { position:fixed; inset:0; height:100dvh; width:100%; overflow:hidden; overscroll-behavior:none; }
+    body.sport-home-active .app { visibility:hidden; pointer-events:none; }
+    .sport-home { position:fixed; inset:0; z-index:9999; display:grid; place-items:center; width:100%; height:100dvh; overflow:hidden; overscroll-behavior:none;
+      background:radial-gradient(circle at 18% 15%,#f9d4ea 0%,transparent 39%),radial-gradient(circle at 84% 76%,#dcd0ff 0%,transparent 45%),linear-gradient(145deg,#fcf8ff,#f3edff); }
+    .sport-home[aria-hidden="true"] { display:none; }
+    .sport-home-choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:clamp(12px,3vw,36px); width:min(900px,calc(100vw - 48px)); max-height:calc(100dvh - 40px); }
+    .sport-choice-card { appearance:none; min-width:0; min-height:clamp(210px,40vh,340px); padding:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px;
+      border-radius:28px; border:1px solid rgba(255,255,255,.92); background:rgba(255,255,255,.88); box-shadow:0 22px 65px rgba(69,35,135,.14); color:#281447;
+      font-size:clamp(20px,2.5vw,32px); font-weight:850; cursor:pointer; transition:transform .2s,box-shadow .2s,border-color .2s; }
+    .sport-choice-card svg { width:clamp(78px,12vw,130px); height:clamp(78px,12vw,130px); fill:none; stroke-width:3.5; stroke-linecap:round; stroke-linejoin:round; }
+    .bike-choice svg { stroke:#7c3aed; } .run-choice svg { stroke:#e54e87; }
+    .sport-choice-card:hover,.sport-choice-card:focus-visible { transform:translateY(-5px); box-shadow:0 32px 76px rgba(69,35,135,.19); outline:0; border-color:rgba(124,58,237,.42); }
+    .sport-choice-card:active { transform:scale(.985); }
+    .mix-logo { width:34px; height:34px; stroke:#7c3aed; stroke-width:3.4; stroke-linejoin:round; stroke-linecap:round; }
+    .brand-mark { font-size:0; }
+    .sport-identity { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:-7px 0 15px; border-radius:12px; background:#f8f3ff; border:1px solid #eadffc; padding:10px 11px; color:#614f80; font-size:11px; font-weight:750; }
+    .sport-identity button { border:0; background:#fff; border-radius:9px; padding:7px 10px; color:#743ce3; font-weight:800; white-space:nowrap; }
+    .sport-label { background:#f0e7ff; color:#6730c9; font-size:10px; font-weight:900; border-radius:999px; padding:5px 8px; vertical-align:middle; white-space:nowrap; }
+    .route-map-status { position:absolute; top:15px; left:112px; z-index:925; min-height:36px; max-width:min(47vw,365px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:12px; font-size:11px; font-weight:750; box-shadow:0 6px 20px rgba(76,29,149,.10); backdrop-filter:blur(8px); }
+    .route-map-status::before { content:""; width:7px; height:7px; flex:none; border-radius:50%; background:currentColor; }
+    .route-map-status.ok { color:#137c53; border:1px solid #b9ebd4; background:rgba(232,251,241,.97); }
+    .route-map-status.info { color:#6337b9; border:1px solid #ded0fa; background:rgba(248,243,255,.96); }
+    .route-map-status.warn { color:#8e600d; border:1px solid #f4e3ae; background:rgba(255,248,227,.97); }
+    .route-map-status.error { color:#ad2945; border:1px solid #ffcad1; background:rgba(255,240,241,.98); }
+    body.sport-run { --accent:#e54e87; --accent-2:#b92366; --pink:#e54e87; --soft:#fff0f6; }
+    body.sport-run .brand-mark { background:#fff0f6; border-color:#ffd6e7; }
+    body.sport-run .waypoint-marker { background:#e54e87; }
+    body.sport-run .waypoint-marker.is-selected { background:#be2868; }
+    body.sport-run .route-choice.active { background:linear-gradient(135deg,#fff0f6,#fff7fb); border-color:#ef98bb; box-shadow:0 8px 22px rgba(229,78,135,.12); }
+    body.sport-run .mix-logo { stroke:#e54e87; }
+    body.sport-run .sport-label { background:#ffe6f1; color:#ad2a61; }
+    body.sport-run .segmented button.active { color:#ad2a61; }
+    body.sport-run .btn-primary { background:#e54e87; border-color:#e54e87; }
+    body.sport-run .btn-primary:hover:not(:disabled) { background:#c33470; }
+    body.sport-run .elevation-stat, body.sport-run #elevationPanel, body.sport-run #roadTypePanel,
+    body.sport-run #nutritionOpenBtn { display:none !important; }
+    body.sport-run .map-summary-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    body.sport-run .details-head p { display:none; }
+    body.sport-run .section-title .sport-label { color:#ae2461; }
+    body.sport-run .desktop-sidebar-toggle { color:#ad2a61; }
+    @media(max-width:850px) {
+      .route-map-status { top:12px; left:139px; max-width:calc(100vw - 160px); min-height:42px; }
+      .sport-home-choices { grid-template-columns:1fr; width:min(450px,calc(100vw - 44px)); gap:15px; }
+      .sport-choice-card { min-height:clamp(150px,30dvh,245px); gap:12px; font-size:23px; border-radius:22px; }
+      .sport-choice-card svg { width:clamp(70px,12vh,100px); height:clamp(70px,12vh,100px); }
     }
-    .home-glow { position:absolute; border-radius:50%; filter:blur(20px); pointer-events:none; z-index:-1; }
-    .home-glow-one { width:540px; height:540px; background:rgba(139,92,246,.13); top:-270px; right:-170px; }
-    .home-glow-two { width:420px; height:420px; background:rgba(236,72,153,.11); bottom:-200px; left:-160px; }
-    .activity-home-inner { width:min(1040px,100%); margin:auto; }
-    .home-brand { display:flex; align-items:center; gap:12px; color:#29194a; font-size:19px; letter-spacing:-.025em; }
-    .home-brand-icon { width:40px; height:40px; border-radius:13px; display:grid; place-items:center; background:#7c3aed; color:#fff; font-size:24px; font-weight:900; }
-    .home-brand-version { margin-left:2px; border:1px solid #e9dcfc; background:#fff; padding:5px 8px; border-radius:8px; color:#7c3aed; font-size:11px; font-weight:800; }
-    .home-eyebrow { margin-top:55px; font-size:12px; font-weight:850; letter-spacing:.14em; color:#a04da3; }
-    .home-title { margin:12px 0; max-width:780px; font-size:clamp(36px,5.8vw,66px); line-height:1.05; letter-spacing:-.055em; font-weight:900; color:#2a1d42; }
-    .home-title span { color:#7c3aed; }
-    .home-lead { max-width:580px; margin:0 0 30px; color:#786b8a; font-size:16px; line-height:1.65; }
-    .activity-cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
-    .activity-card {
-      display:flex; flex-direction:column; gap:10px; align-items:flex-start; text-align:left;
-      min-height:325px; padding:26px; border:1px solid #e8def5; border-radius:24px; cursor:pointer;
-      background:rgba(255,255,255,.87); box-shadow:0 16px 45px rgba(76,29,149,.09);
-      transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease; color:#2a1d42;
+    @media(max-height:510px) {
+      .sport-home-choices { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .sport-choice-card { min-height:140px; height:min(70dvh,290px); gap:10px; font-size:clamp(16px,3vh,25px); }
+      .sport-choice-card svg { height:min(22dvh,90px); width:min(22dvh,90px); }
     }
-    .activity-card:hover, .activity-card:focus-visible { transform:translateY(-5px); border-color:#b79cef; box-shadow:0 23px 53px rgba(76,29,149,.15); outline:none; }
-    .activity-running:hover, .activity-running:focus-visible { border-color:#c690a8; }
-    .activity-visual { display:grid; place-items:center; width:90px; height:68px; color:#7c3aed; background:#f2ebff; border-radius:19px; margin-bottom:8px; }
-    .activity-running .activity-visual { background:#fcecf3; color:#c22976; }
-    .activity-visual svg { width:72px; height:50px; }
-    .activity-kicker { text-transform:uppercase; letter-spacing:.12em; font-size:10px; font-weight:850; color:#9c7ab7; }
-    .activity-card strong { font-size:26px; letter-spacing:-.03em; }
-    .activity-desc { font-size:14px; color:#796e88; line-height:1.55; }
-    .activity-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
-    .activity-tags i { font-style:normal; font-size:11px; font-weight:750; border-radius:100px; padding:6px 9px; color:#7250ab; background:#f5eeff; }
-    .activity-running .activity-tags i { color:#a02d70; background:#fff0f6; }
-    .activity-cta { margin-top:auto; padding-top:14px; color:#6923c2; font-weight:850; font-size:14px; display:flex; justify-content:space-between; width:100%; }
-    .activity-running .activity-cta { color:#bf2874; }
-    .activity-cta b { font-size:20px; }
-    .home-note { text-align:center; font-size:12px; color:#9a91a7; margin:25px 0 0; }
-    .change-activity-btn { width:100%; text-align:left; border:1px solid #eee3f5; border-radius:11px; background:#fcf9ff; color:#722bc0; padding:9px 11px; font-weight:800; font-size:11px; margin-bottom:8px; }
-    .change-activity-btn:hover { background:#f4edff; }
-    .route-status-map {
-      position:absolute; z-index:810; left:14px; top:76px; max-width:min(440px,calc(100% - 30px));
-      padding:9px 12px; font-size:12px; line-height:1.4; border:1px solid #e9dcfa; border-radius:12px;
-      background:rgba(255,255,255,.96); box-shadow:0 8px 18px rgba(55,35,95,.12);
-      color:#675976; pointer-events:none;
+    @media(prefers-reduced-motion:reduce) {
+      .sport-choice-card { transition:none; }
+      .sport-choice-card:hover { transform:none; }
     }
-    .route-status-map.ok { background:rgba(246,255,248,.97); border-color:#c8e9d0; color:#286c3a; }
-    .route-status-map.error { background:rgba(255,241,245,.97); border-color:#f2bcca; color:#a02c4a; }
-    .route-status-map.warn { background:rgba(255,249,238,.97); border-color:#ecd8a1; color:#875b1b; }
-    .waypoint-marker-endpoint { background:#251f40 !important; color:#fff !important; border-color:#fff !important; }
-    body.activity-run .ascend-stat, body.activity-run .descend-stat,
-    body.activity-run #elevationPanel, body.activity-run #roadTypePanel,
-    body.activity-run #nutritionOpenBtn, body.activity-run #filterPanel,
-    body.activity-run .details-head { display:none !important; }
-    body.activity-run .map-summary-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    body.activity-run .route-summary-wrap .map-summary { max-width:100%; }
-    body.activity-run .details-grid { display:block; }
-    body.activity-run .below-map { padding-top:16px; }
-    body.activity-run .detail-card { max-width:600px; margin:0 auto; }
-    @media (max-width:760px) {
-      .activity-home { padding:22px 14px; }
-      .home-eyebrow { margin-top:30px; }
-      .activity-cards { grid-template-columns:1fr; gap:12px; }
-      .activity-card { min-height:248px; padding:19px; }
-      .activity-visual { width:72px; height:55px; margin-bottom:3px; }
-      .activity-card strong { font-size:22px; }
-      .home-title { font-size:clamp(32px,8vw,48px); }
-      .home-lead { font-size:14px; }
-      .route-status-map { left:10px; right:10px; top:65px; max-width:none; font-size:11px; }
-    }
-    @media (prefers-reduced-motion:reduce) { .activity-card { transition:none; } }
 
   </style>
 </head>
-<body class="activity-home-open">
-  <section id="activityHome" class="activity-home" aria-label="Choisir une activité">
-    <div class="home-glow home-glow-one" aria-hidden="true"></div>
-    <div class="home-glow home-glow-two" aria-hidden="true"></div>
-    <div class="activity-home-inner">
-      <div class="home-brand"><span class="home-brand-icon">↗</span><strong>RouteVelo</strong><span class="home-brand-version">V45</span></div>
-      <div class="home-eyebrow">TON PARCOURS, TON TERRAIN</div>
-      <h1 class="home-title">Partir rouler ou <span>partir courir ?</span></h1>
-      <p class="home-lead">Deux façons d'explorer. Choisis ton activité, crée un trajet et exporte ton GPX.</p>
-      <div class="activity-cards">
-        <button id="chooseBike" type="button" class="activity-card activity-bike">
-          <span class="activity-visual" aria-hidden="true"><svg viewBox="0 0 120 76" fill="none"><circle cx="26" cy="53" r="18" stroke="currentColor" stroke-width="4"/><circle cx="95" cy="53" r="18" stroke="currentColor" stroke-width="4"/><path d="M26 53L43 22L66 53H26L47 31M66 53L82 25L95 53M79 25H89M42 22H52" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-          <span class="activity-kicker">01 · SUR ROUTE</span>
-          <strong>Vélo de route</strong>
-          <span class="activity-desc">Routes goudronnées, pistes cyclables et parcours optimisés pour le vélo de route.</span>
-          <span class="activity-tags"><i>Départ → arrivée</i><i>Boucle</i><i>Nutrition</i></span>
-          <span class="activity-cta">Planifier une sortie <b>→</b></span>
-        </button>
-        <button id="chooseRun" type="button" class="activity-card activity-running">
-          <span class="activity-visual" aria-hidden="true"><svg viewBox="0 0 120 76" fill="none"><circle cx="68" cy="11" r="8" fill="currentColor"/><path d="M54 26L72 30L82 42M54 26L42 45L28 49M54 26L64 49L88 65M64 49L43 61L27 65" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-          <span class="activity-kicker">02 · NATURE & SENTIERS</span>
-          <strong>Course à pied</strong>
-          <span class="activity-desc">Chemins, forêts, sentiers et petites routes accessibles à pied, pour varier les terrains.</span>
-          <span class="activity-tags"><i>Départ → arrivée</i><i>Aller-retour</i><i>Boucle</i></span>
-          <span class="activity-cta">Créer un parcours <b>→</b></span>
-        </button>
-      </div>
-      <p class="home-note">Cartes OpenStreetMap · Routage libre · Export GPX</p>
+<body class="sport-home-active sport-bike">
+  <div id="sportHome" class="sport-home" aria-label="Choisir une activité">
+    <div class="sport-home-choices">
+      <button id="chooseBike" class="sport-choice-card bike-choice" type="button" aria-label="Choisir Vélo de route">
+        <svg viewBox="0 0 72 72" aria-hidden="true"><circle cx="16" cy="49" r="12"/><circle cx="56" cy="49" r="12"/><path d="M16 49 31 24 43 49H16L31 24h10l15 25-9-28M25 19h11"/></svg>
+        <span>Vélo de route</span>
+      </button>
+      <button id="chooseRun" class="sport-choice-card run-choice" type="button" aria-label="Choisir Course à pied">
+        <svg viewBox="0 0 72 72" aria-hidden="true"><circle cx="44" cy="15" r="7"/><path d="m23 35 15-11 10 7 11 2M38 24l-3 17 13 8-3 13M35 41l-17 10-7 11M16 26l9 9"/></svg>
+        <span>Course à pied</span>
+      </button>
     </div>
-  </section>
+  </div>
   <main id="routeApp" class="app">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">🚴</div>
+        <div class="brand-mark" aria-hidden="true">
+          <svg class="mix-logo" viewBox="0 0 72 72" fill="none"><circle cx="16" cy="50" r="10"/><circle cx="43" cy="50" r="10"/><path d="M16 50 26 31l17 19-10-22H25M52 14a5 5 0 1 0 0-.01Z"/><path d="m50 25-10 8 10 7 11 2m-11-2-4 15 11 7M46 55l-13 8"/></svg>
+        </div>
         <div>
-          <h1>RouteVelo</h1>
-          <div id="activitySubtitle" class="subtitle">Itinéraires vélo de route</div>
+          <h1>VéloRun</h1>
+          <div id="sportSubtitle" class="subtitle">Vélo de route</div>
         </div>
         <button id="mobileCloseBtn" class="mobile-close-btn" type="button" aria-label="Fermer les réglages">×</button>
       </div>
+      <div class="sport-identity"><span id="sportIdentityLabel">Mode vélo · routes asphaltées</span><button id="changeSportBtn" type="button">Changer</button></div>
 
-      <button id="changeActivityBtn" class="change-activity-btn" type="button">← Choisir une autre activité</button>
       <section class="section stack">
-        <div id="activitySectionTitle" class="section-title">Itinéraire vélo</div>
+        <div class="section-title">Itinéraire <span class="sport-label" id="sportLabel">VÉLO</span></div>
         <div class="segmented" aria-label="Type de trajet">
           <button id="modeAB" type="button" class="active">Départ → arrivée</button>
           <button id="modeLoop" type="button">Boucle</button>
@@ -1439,7 +1405,7 @@
           <input id="endSearch" type="text" placeholder="Ville ou adresse" />
           <label class="checkbox-option" for="returnToStart">
             <input id="returnToStart" type="checkbox" />
-            <span><strong id="returnToStartTitle">Retour au point de départ</strong><small id="returnToStartHelp">Départ → arrivée → départ, avec un retour différent de l’aller autant que possible.</small></span>
+            <span><strong>Retour au point de départ</strong><small>Départ → arrivée → départ, avec un retour différent de l’aller autant que possible.</small></span>
           </label>
         </div>
 
@@ -1452,15 +1418,14 @@
           </div>
           <label for="loopDistance">Distance moyenne cible</label>
           <div class="grid2">
-            <input id="loopDistance" type="number" min="10" max="350" step="5" value="80" inputmode="decimal" />
+            <input id="loopDistance" type="number" min="10" max="350" step="5" value="80" />
             <button id="generateLoopBtn" class="btn btn-primary" type="button">Proposer 3 boucles</button>
           </div>
-          <div id="loopModeHint" class="note">3 boucles sont recherchées sans aller-retour. Les petits décrochements parasites sont coupés automatiquement sur tous les parcours.</div>
+          <div class="note">3 boucles sont recherchées sans aller-retour. Les petits décrochements parasites sont coupés automatiquement sur tous les parcours.</div>
         </div>
 
-        <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer mon parcours</button>
-        <div id="manualPointHelp" class="note manual-point-help">Clique sur la carte pour poser un départ, une arrivée ou ajouter un point de passage. Chaque nouveau passage reçoit le numéro suivant (sans déplacer les précédents). Déplace les points par glisser-déposer.</div>
-        <div id="routeStatus" class="status" role="status" aria-live="polite">Choisis deux lieux ou pose deux points sur la carte.</div>
+        <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer 3 itinéraires</button>
+        <div id="manualPointHelp" class="note manual-point-help">Clique sur la carte pour poser un point. Chaque clic ajoute le numéro suivant, et tu peux déplacer les points.</div>
       </section>
 
       <a class="logout-link" href="/logout">Se déconnecter</a>
@@ -1477,8 +1442,8 @@
     <section class="map-wrap">
       <button id="desktopSidebarToggle" class="desktop-sidebar-toggle" type="button" aria-label="Rétracter le menu" aria-expanded="true">←</button>
       <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Ouvrir les réglages">☰ Itinéraire</button>
+      <span id="routeMapStatus" class="route-map-status ok" role="status" aria-live="polite">Prêt</span>
       <div id="map" aria-label="Carte de planification d’itinéraire"></div>
-      <div id="routeStatusMap" class="route-status-map hidden" role="status" aria-live="polite"></div>
       <aside id="filterPanel" class="filter-panel collapsed" aria-label="Filtres de la carte">
         <button id="filterToggleBtn" class="filter-panel-head" type="button" aria-expanded="false" aria-controls="filterBody">
           <span><strong>Filtres</strong><small>Points utiles sur le trajet</small></span>
@@ -1505,9 +1470,9 @@
         <div class="map-summary-main">
           <div class="map-summary-stats">
             <div class="summary-stat"><strong id="distanceStat">—</strong><span>Distance</span></div>
-            <div class="summary-stat"><strong id="timeStat">—</strong><span>Temps</span></div>
-            <div class="summary-stat ascend-stat"><strong id="ascendStat">—</strong><span>D+</span></div>
-            <div class="summary-stat descend-stat"><strong id="descendStat">—</strong><span>D−</span></div>
+            <div class="summary-stat"><strong id="timeStat">—</strong><span id="timeStatLabel">Temps</span></div>
+            <div class="summary-stat elevation-stat"><strong id="ascendStat">—</strong><span>D+</span></div>
+            <div class="summary-stat elevation-stat"><strong id="descendStat">—</strong><span>D−</span></div>
           </div>
         </div>
       </div>
@@ -1579,7 +1544,7 @@
     <div id="nutritionDialog" class="nutrition-dialog" role="dialog" aria-modal="true" aria-labelledby="nutritionModalTitle" tabindex="-1">
       <div class="nutrition-dialog-head">
         <div>
-          <div class="nutrition-dialog-kicker">RouteVelo · ravitaillement</div>
+          <div class="nutrition-dialog-kicker">VéloRun · ravitaillement</div>
           <h2 id="nutritionModalTitle" class="nutrition-dialog-title">Plan nutritionnel</h2>
           <div id="nutritionRouteHint" class="nutrition-subtitle">Calcule un trajet pour créer ton plan.</div>
         </div>
@@ -1692,12 +1657,6 @@
       const ALLOWED_SURFACES = new Set(['paved_smooth', 'paved']);
 
       const els = {
-        activityHome: document.getElementById('activityHome'),
-        changeActivityBtn: document.getElementById('changeActivityBtn'),
-        chooseBike: document.getElementById('chooseBike'),
-        chooseRun: document.getElementById('chooseRun'),
-        routeStatus: document.getElementById('routeStatus'),
-        routeStatusMap: document.getElementById('routeStatusMap'),
         modeAB: document.getElementById('modeAB'),
         modeLoop: document.getElementById('modeLoop'),
         abControls: document.getElementById('abControls'),
@@ -1714,6 +1673,15 @@
         mobileMenuBtn: document.getElementById('mobileMenuBtn'),
         mobileCloseBtn: document.getElementById('mobileCloseBtn'),
         mobileOverlay: document.getElementById('mobileOverlay'),
+        sportHome: document.getElementById('sportHome'),
+        chooseBike: document.getElementById('chooseBike'),
+        chooseRun: document.getElementById('chooseRun'),
+        changeSportBtn: document.getElementById('changeSportBtn'),
+        routeMapStatus: document.getElementById('routeMapStatus'),
+        sportLabel: document.getElementById('sportLabel'),
+        timeStatLabel: document.getElementById('timeStatLabel'),
+        sportSubtitle: document.getElementById('sportSubtitle'),
+        sportIdentityLabel: document.getElementById('sportIdentityLabel'),
         routeChoices: document.getElementById('routeChoices'),
         waypointList: document.getElementById('waypointList'),
         undoBtn: document.getElementById('undoBtn'),
@@ -1777,7 +1745,7 @@
       };
 
       const state = {
-        activity: 'bike',
+        sport: 'bike',
         mode: 'ab',
         waypoints: [],
         waypointHistory: [],
@@ -1813,7 +1781,6 @@
         loopSeed: 0,
         recalcTimer: null,
         manualEditInProgress: false,
-        geocodeSerial: 0,
         requestSerial: 0
       };
 
@@ -1832,62 +1799,64 @@
       state.currentLocationLayer.addTo(map);
 
       function setStatus(message, kind = '') {
-        const value = String(message || '');
-        for (const el of [els.routeStatus, els.routeStatusMap]) {
-          if (!el) continue;
-          el.textContent = value;
-          el.classList.remove('ok', 'warn', 'error');
-          if (kind) el.classList.add(kind);
-          el.classList.toggle('hidden', !value);
-        }
-        if (kind === 'error') console.warn('[RouteVelo]', value);
+        if (!els.routeMapStatus) return;
+        const raw = String(message || 'Prêt');
+        const positive = /^(itinéraire|tracé modifié|point|boucle|\d+ proposition|\d+ boucle|aucun itinéraire|prêt)/i.test(raw);
+        const statusKind = kind === 'error' ? 'error' : kind === 'warn' ? 'warn' : positive ? 'ok' : 'info';
+        const short = raw.length > 55 ? raw.slice(0, 52).trimEnd() + '…' : raw;
+        els.routeMapStatus.textContent = short;
+        els.routeMapStatus.title = raw;
+        els.routeMapStatus.className = 'route-map-status ' + statusKind;
       }
 
-      function isRunning() { return state.activity === 'run'; }
-
-      function chooseActivity(activity) {
-        if (activity !== 'bike' && activity !== 'run') return;
-        state.activity = activity;
-        document.body.classList.remove('activity-home-open');
-        document.body.classList.toggle('activity-run', activity === 'run');
-        document.body.classList.toggle('activity-bike', activity === 'bike');
-        els.activityHome?.classList.add('hidden');
-        els.activityHome?.setAttribute('aria-hidden', 'true');
-        document.getElementById('activitySubtitle').textContent = activity === 'run' ? 'Parcours course à pied & sentiers' : 'Itinéraires vélo de route';
-        document.getElementById('activitySectionTitle').textContent = activity === 'run' ? 'Itinéraire à pied' : 'Itinéraire vélo';
-        document.getElementById('returnToStartTitle').textContent = activity === 'run' ? 'Faire un aller-retour' : 'Retour au point de départ';
-        document.getElementById('returnToStartHelp').textContent = activity === 'run'
-          ? 'Départ → destination → départ, par les chemins et sentiers accessibles.'
-          : 'Départ → arrivée → départ, avec un retour différent de l’aller autant que possible.';
-        document.getElementById('loopModeHint').textContent = activity === 'run'
-          ? 'Plusieurs boucles sont recherchées sur les chemins, sentiers et rues accessibles à pied.'
-          : '3 boucles sont recherchées sans aller-retour. Les petits décrochements parasites sont coupés automatiquement sur tous les parcours.';
-        els.loopDistance.min = activity === 'run' ? '2' : '10';
-        els.loopDistance.max = activity === 'run' ? '80' : '350';
-        els.loopDistance.step = activity === 'run' ? '1' : '5';
-        els.loopDistance.value = activity === 'run' ? '10' : '80';
-        els.startSearch.value = '';
-        els.endSearch.value = '';
-        els.loopSearch.value = '';
-        els.returnToStart.checked = false;
-        els.calculateBtn.textContent = activity === 'run' ? 'Créer mon parcours à pied' : 'Calculer mon parcours';
-        els.generateLoopBtn.textContent = 'Proposer 3 boucles';
-        switchMode('ab');
-        closeMobilePanel();
-        if (window.innerWidth <= 850) openMobilePanel();
-        setStatus(activity === 'run'
-          ? 'Course à pied : les chemins, sentiers et forêts sont autorisés. Indique un départ et une arrivée, ou clique sur la carte.'
-          : 'Vélo de route : calcul sur routes revêtues. Indique un départ et une arrivée, ou clique sur la carte.', 'ok');
-        requestAnimationFrame(() => { map.invalidateSize(false); syncDesktopHomeHeight(); });
-      }
-
-      function showActivityHome() {
-        document.body.classList.add('activity-home-open');
+      function applySport(sport) {
+        const next = sport === 'run' ? 'run' : 'bike';
         ++state.requestSerial;
+        clearTimeout(state.recalcTimer);
+        state.sport = next;
+        document.body.classList.toggle('sport-run', next === 'run');
+        document.body.classList.toggle('sport-bike', next === 'bike');
+        if (els.sportSubtitle) els.sportSubtitle.textContent = next === 'run' ? 'Course à pied' : 'Vélo de route';
+        if (els.sportLabel) els.sportLabel.textContent = next === 'run' ? 'RUN' : 'VÉLO';
+        if (els.timeStatLabel) els.timeStatLabel.textContent = next === 'run' ? 'Temps estimé · 6 min/km' : 'Temps';
+        if (els.sportIdentityLabel) els.sportIdentityLabel.textContent = next === 'run' ? 'Mode course · sentiers, forêts et chemins' : 'Mode vélo · routes asphaltées';
+        if (els.loopDistance) {
+          els.loopDistance.min = next === 'run' ? '2' : '10';
+          els.loopDistance.max = next === 'run' ? '70' : '350';
+          els.loopDistance.value = next === 'run' ? '10' : '80';
+        }
+        if (els.calculateBtn) els.calculateBtn.textContent = next === 'run' ? 'Calculer mon parcours' : abCalculateLabel();
+        if (els.generateLoopBtn) els.generateLoopBtn.textContent = next === 'run' ? 'Créer des boucles' : 'Proposer 3 boucles';
+        if (els.manualPointHelp) els.manualPointHelp.textContent = next === 'run'
+          ? 'Course à pied : routes, sentiers et chemins forestiers. Chaque clic ajoute un nouveau point numéroté.'
+          : 'Vélo de route : routes revêtues uniquement. Chaque clic ajoute le numéro suivant.';
+        state.mode = 'ab';
+        els.modeAB.classList.add('active');
+        els.modeLoop.classList.remove('active');
+        els.abControls.classList.remove('hidden');
+        els.loopControls.classList.add('hidden');
+        els.calculateBtn.classList.remove('hidden');
         clearAll();
+        setStatus(next === 'run' ? 'Mode course à pied prêt' : 'Mode vélo prêt', '');
         closeMobilePanel();
-        els.activityHome?.classList.remove('hidden');
-        els.activityHome?.setAttribute('aria-hidden', 'false');
+        requestAnimationFrame(() => map.invalidateSize(false));
+      }
+
+      function selectSport(sport) {
+        applySport(sport);
+        document.body.classList.remove('sport-home-active');
+        els.sportHome?.setAttribute('aria-hidden', 'true');
+        requestAnimationFrame(() => map.invalidateSize(false));
+        setTimeout(() => map.invalidateSize(false), 250);
+      }
+
+      function goSportHome() {
+        ++state.requestSerial;
+        clearTimeout(state.recalcTimer);
+        document.body.classList.remove('mobile-panel-open');
+        document.body.classList.add('sport-home-active');
+        els.sportHome?.removeAttribute('aria-hidden');
+        els.chooseBike?.focus();
       }
 
       function setBusy(button, busy, label) {
@@ -2634,18 +2603,10 @@
         clearAll();
       }
 
-      function waypointLabel(i) {
-        if (i === 0) return 'D';
-        if (state.mode === 'ab' && i === state.waypoints.length - 1) return 'A';
-        return String(i);
-      }
-
       function markerIcon(i) {
-        const label = waypointLabel(i);
-        const special = (label === 'D' || label === 'A') ? ' waypoint-marker-endpoint' : '';
         return L.divIcon({
           className: '',
-          html: `<div class="waypoint-marker${special}" data-waypoint-index="${i}" title="${label === 'D' ? 'Départ' : label === 'A' ? 'Arrivée' : 'Passage ' + label}">${label}</div>`,
+          html: `<div class="waypoint-marker" data-waypoint-index="${i}">${i + 1}</div>`,
           iconSize: [30, 30], iconAnchor: [15, 15]
         });
       }
@@ -2747,7 +2708,7 @@
           marker.on('dragend', () => {
             const p = marker.getLatLng();
             rememberWaypoints();
-            state.waypoints[i] = { ...state.waypoints[i], lat: p.lat, lng: p.lng };
+            state.waypoints[i] = { lat: p.lat, lng: p.lng };
             state.manualEditInProgress = true;
             renderWaypointList();
             marker.setZIndexOffset(2500);
@@ -2769,7 +2730,7 @@
         state.waypoints.forEach((wp, i) => {
           const row = document.createElement('div');
           row.className = 'waypoint-row';
-          row.innerHTML = `<span class="waypoint-index">${waypointLabel(i)}</span><span class="coord">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</span><button type="button" class="icon-btn" aria-label="Supprimer le point ${waypointLabel(i)}">✕</button>`;
+          row.innerHTML = `<span class="waypoint-index">${i + 1}</span><span class="coord">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</span><button type="button" class="icon-btn" aria-label="Supprimer le point ${i + 1}">✕</button>`;
           row.querySelector('button').addEventListener('click', () => {
             rememberWaypoints();
             state.waypoints.splice(i, 1);
@@ -2809,14 +2770,12 @@
         updatePoiCounts();
         resetStats();
         clearRouteChoices();
-        setStatus('Prêt. Choisis des lieux ou pose des points sur la carte.');
+        setStatus('Prêt à créer un parcours.', 'ok');
       }
 
       function clearAll() {
         ++state.requestSerial;
-        ++state.geocodeSerial;
         clearTimeout(state.recalcTimer);
-        state.manualEditInProgress = false;
         state.waypoints = [];
         state.waypointHistory = [];
         updateUndoButton();
@@ -2848,80 +2807,73 @@
         return bestIndex;
       }
 
-      function nextWaypointIndex() {
-        // L'ordre d'ajout est le seul critère de numérotation : un clic près
-        // du point 1 doit créer le point 6, pas réinsérer un point 2.
-        return state.mode === 'ab' ? Math.max(1, state.waypoints.length - 1) : state.waypoints.length;
+      function insertionIndexForRoutePoint(_wp) {
+        // Toujours ajouter le prochain numéro APRÈS le dernier point.
+        // Ne jamais insérer « point 2 » quand l'utilisateur clique près du point 1.
+        return state.waypoints.length;
       }
 
       function addPoint(latlng) {
-        if (!latlng || !Number.isFinite(latlng.lat) || !Number.isFinite(latlng.lng)) return;
         const wp = { lat: latlng.lat, lng: latlng.lng };
-        rememberWaypoints();
-        if (state.mode === 'loop') {
-          if (!state.waypoints.length) {
-            state.waypoints = [{ ...wp, label: 'Départ sur la carte', searchValue: 'Départ sur la carte' }];
-            els.loopSearch.value = 'Départ sur la carte';
-            refreshWaypointMarkers();
-            setStatus('Départ de boucle placé. Indique une distance puis clique sur Proposer 3 boucles.', 'ok');
-            return;
-          }
-          if (state.waypoints.length === 1 && !state.routeLayer) {
-            // En mode Boucle, le premier clic fixe le départ. Après sélection,
-            // les clics ajoutent les passages à la fin de la liste.
-            state.waypoints[0] = { ...wp, label: 'Départ sur la carte', searchValue: 'Départ sur la carte' };
-            els.loopSearch.value = 'Départ sur la carte';
-            refreshWaypointMarkers();
-            setStatus('Départ mis à jour. Lance la création de boucle.', 'ok');
-            return;
-          }
+
+        // Un clic sur une route deja calculee ajoute un passage exactement
+        // a l'endroit logique du parcours puis recalcule le trace.
+        if (state.routeLayer && state.routeCoords.length >= 2 && state.waypoints.length >= 2) {
+          rememberWaypoints();
+          const insertAt = insertionIndexForRoutePoint(wp);
           state.waypoints.push(wp);
-        } else if (!state.waypoints.length) {
-          state.waypoints.push({ ...wp, label: 'Départ sur la carte', searchValue: 'Départ sur la carte' });
-          els.startSearch.value = 'Départ sur la carte';
+          state.manualEditInProgress = true;
           refreshWaypointMarkers();
-          setStatus('Départ placé. Clique pour choisir l’arrivée.', 'ok');
-          return;
-        } else if (state.waypoints.length === 1 && !state.routeLayer) {
-          if (state.waypoints[0].endpoint === 'end') {
-            state.waypoints.unshift({ ...wp, label: 'Départ sur la carte', searchValue: 'Départ sur la carte' });
-            els.startSearch.value = 'Départ sur la carte';
-          } else {
-            state.waypoints.push({ ...wp, label: 'Arrivée sur la carte', searchValue: 'Arrivée sur la carte', endpoint: 'end' });
-            els.endSearch.value = 'Arrivée sur la carte';
+          const addedMarker = state.markers[insertAt];
+          const node = waypointMarkerNode(addedMarker);
+          if (node) {
+            node.classList.add('is-new', 'is-selected');
+            setTimeout(() => node.classList.remove('is-new', 'is-selected'), 620);
           }
-        } else {
-          // Toujours insérer juste AVANT l'arrivée, sans modifier l'ordre
-          // des passages existants. Les marqueurs D et A restent fixes.
-          state.waypoints.splice(state.waypoints.length - 1, 0, wp);
+          setStatus(`Point ${insertAt + 1} ajouté. Recalcul du trajet…`);
+          scheduleRecalc();
+          return;
         }
-        const index = state.mode === 'ab' ? state.waypoints.length - 2 : state.waypoints.length - 1;
-        state.manualEditInProgress = true;
-        refreshWaypointMarkers();
-        const marker = state.markers[Math.max(0, index)];
-        const node = waypointMarkerNode(marker);
-        if (node) {
-          node.classList.add('is-new', 'is-selected');
-          setTimeout(() => node.classList.remove('is-new', 'is-selected'), 620);
+
+        // En A -> B : le premier clic place le départ ; le deuxième l'arrivée.
+        // Les clics suivants ajoutent des passages, sans renuméroter les anciens.
+        if (state.mode === 'ab' && !state.routeLayer && !state.routeOptions.length) {
+          rememberWaypoints();
+          state.waypoints.push(wp);
+          if (state.waypoints.length === 1) els.startSearch.value = '';
+          else els.endSearch.value = '';
+          refreshWaypointMarkers();
+          setStatus(state.waypoints.length === 1 ? 'Départ placé : choisis l’arrivée' : 'Départ et arrivée placés. Calcul…');
+          if (state.waypoints.length >= 2) scheduleRecalc();
+          return;
         }
-        setStatus('Point ajouté. Recalcul du trajet…');
-        scheduleRecalc();
+        // Avant de generer une boucle, un clic peut toujours definir son depart.
+        if (state.mode === 'loop' && !state.routeOptions.length) {
+          rememberWaypoints();
+          state.waypoints = [wp];
+          els.loopSearch.value = '';
+          refreshWaypointMarkers();
+          clearRouteOnly();
+        }
       }
 
       function scheduleRecalc() {
         clearTimeout(state.recalcTimer);
         state.recalcTimer = setTimeout(() => {
           if (!canRoute()) return;
-          recalculateEditedRoute().catch(err => setStatus(err.message || 'Erreur de recalcul.', 'error'));
-        }, 280);
+          // Dès qu'un tracé existe (ou qu'un point vient d'être manipulé),
+          // on recalcule à partir des coordonnées réellement présentes sur
+          // la carte. L'ancienne V42 relançait le géocodage avec seulement
+          // 2 points et pouvait donc annuler un déplacement manuel.
+          // Les points posés à la main sont TOUJOURS routés directement.
+          recalculateEditedRoute().catch(() => {});
+        }, 260);
       }
 
+      // Apres calcul, un clic sur la carte ajoute un point de passage et modifie le trace.
+      // Pendant l'aperçu des 3 boucles, on attend d'abord que l'utilisateur en choisisse une.
       map.on('click', e => {
-        if (els.activityHome && !els.activityHome.classList.contains('hidden')) return;
-        if (state.mode === 'loop' && state.loopPreviewLayer && state.selectedRouteOption < 0) {
-          setStatus('Choisis d’abord une des boucles proposées, puis ajoute tes points.', 'warn');
-          return;
-        }
+        if (state.mode === 'loop' && state.loopPreviewLayer && state.selectedRouteOption < 0) return;
         addPoint(e.latlng);
       });
 
@@ -2941,35 +2893,31 @@
       }
 
       async function placeFromSearch(input, position) {
-        const query = input.value.trim();
-        const ticket = ++state.geocodeSerial;
         try {
           setStatus('Recherche de l’adresse…');
-          const p = { ...(await geocode(query)), searchValue: query };
-          if (ticket !== state.geocodeSerial) return;
+          const p = await geocode(input.value);
           rememberWaypoints();
           if (state.mode === 'ab') {
             if (position === 'start') {
-              if (!state.waypoints.length) state.waypoints = [p];
-              else if (state.waypoints.length === 1 && state.waypoints[0].endpoint === 'end') {
-                state.waypoints = [p, state.waypoints[0]];
-              } else state.waypoints[0] = p;
+              if (state.waypoints.length === 0) state.waypoints.push(p);
+              else state.waypoints[0] = p;
             } else {
-              p.endpoint = 'end';
-              if (!state.waypoints.length) state.waypoints = [p];
-              else if (state.waypoints.length === 1 && state.waypoints[0].endpoint === 'end') state.waypoints[0] = p;
-              else if (state.waypoints.length === 1) state.waypoints.push(p);
+              if (state.waypoints.length === 0) state.waypoints.push(p);
+              if (state.waypoints.length === 1) state.waypoints.push(p);
               else state.waypoints[state.waypoints.length - 1] = p;
             }
-          } else state.waypoints = [p];
+          } else {
+            state.waypoints = [p];
+          }
           refreshWaypointMarkers();
           map.setView([p.lat, p.lng], 13);
-          setStatus('Point placé.', 'ok');
+          setStatus('Point placé.');
           if (canRoute()) scheduleRecalc();
         } catch (err) {
-          if (ticket === state.geocodeSerial) setStatus(err.message || 'Erreur de recherche.', 'error');
+          setStatus(err.message || 'Erreur de recherche.', 'error');
         }
       }
+
 
       function geolocationErrorMessage(error) {
         if (!error) return 'Impossible d’obtenir la position de ce PC.';
@@ -3007,12 +2955,11 @@
         state.currentLocation = { ...p, accuracy };
         showCurrentLocation(p, accuracy);
         if (state.mode === 'ab') {
-          const gpsPoint = { ...p, label: 'Ma position', searchValue: 'Ma position' };
-          if (state.waypoints.length === 0) state.waypoints.push(gpsPoint);
-          else state.waypoints[0] = gpsPoint;
+          if (state.waypoints.length === 0) state.waypoints.push({ ...p });
+          else state.waypoints[0] = { ...p };
           els.startSearch.value = 'Ma position';
         } else {
-          state.waypoints = [{ ...p, label: 'Ma position', searchValue: 'Ma position' }];
+          state.waypoints = [{ ...p }];
           els.loopSearch.value = 'Ma position';
         }
         refreshWaypointMarkers();
@@ -3060,12 +3007,6 @@
           service_penalty: 30,
           service_factor: 1.4
         };
-      }
-
-      function pedestrianCosting() {
-        // Valhalla pedestrian laisse les sentiers et chemins praticables à pied.
-        // Contrairement au vélo de route, aucune exclusion de surface n'est appliquée.
-        return { walking_speed: 8.5, walkway_factor: 0.85, use_tracks: 1, use_ferry: 0, use_hills: 0.5 };
       }
 
       function requestLocations(waypoints = state.waypoints, loop = state.mode === 'loop') {
@@ -3221,7 +3162,7 @@
         };
       }
 
-      function normalizeTrip(trip, raw, preserveWaypoints = false) {
+      function normalizeTrip(trip, raw) {
         if (!trip || !trip.summary || !Array.isArray(trip.legs) || !trip.legs.length) throw new Error('Le moteur n’a renvoyé aucun itinéraire.');
         const coords = [];
         trip.legs.forEach(leg => {
@@ -3235,20 +3176,20 @@
           });
         });
         if (coords.length < 2) throw new Error('La géométrie du trajet est vide.');
+        const distance = Number(trip.summary.length) * 1000;
         const route = {
-          distance: Number(trip.summary.length) * 1000,
-          time: Number(trip.summary.time) * 1000,
+          distance,
+          // Marche piétonne pour le tracé; temps de course indicatif à 6 min/km.
+          time: state.sport === 'run' ? distance * 360 : Number(trip.summary.time) * 1000,
           coords,
           encoded: encodePolyline6(coords),
           raw
         };
-        // Respecter les passages places manuellement : leur trace n'est jamais
-        // coupe par le nettoyage des petits decrochages automatiques.
-        return preserveWaypoints ? route : removeSmallRouteDetours(route);
+        return state.sport === 'run' ? route : removeSmallRouteDetours(route);
       }
 
-      function normalizeRoute(data, preserveWaypoints = false) {
-        return normalizeTrip(data && data.trip, data, preserveWaypoints);
+      function normalizeRoute(data) {
+        return normalizeTrip(data && data.trip, data);
       }
 
       function normalizeRouteSet(data) {
@@ -3264,7 +3205,7 @@
       }
 
       function cloneWaypoints(points) {
-        return points.map(p => ({ ...p, lat: p.lat, lng: p.lng }));
+        return points.map(p => ({ lat: p.lat, lng: p.lng, ...(p.label ? { label: p.label } : {}) }));
       }
 
       function distinctRoutes(routes) {
@@ -3283,28 +3224,42 @@
       async function fetchRouteData(serial, options = {}) {
         const waypoints = options.waypoints || state.waypoints;
         const loop = options.loop ?? (state.mode === 'loop');
-        const profile = isRunning() ? 'pedestrian' : 'bicycle';
-        const costing = { ...(isRunning() ? pedestrianCosting() : bicycleCosting()), ...(options.costingOverrides || {}) };
+        const isRun = state.sport === 'run';
+        const costing = isRun
+          ? { walking_speed: 6, walkway_factor: 0.8, use_ferry: 0, max_hiking_difficulty: 1, ...(options.costingOverrides || {}) }
+          : { ...bicycleCosting(), ...(options.costingOverrides || {}) };
+        const costingType = isRun ? 'pedestrian' : 'bicycle';
         const payload = {
           locations: requestLocations(waypoints, loop),
-          costing: profile,
-          costing_options: { [profile]: costing },
+          costing: costingType,
+          costing_options: { [costingType]: costing },
           directions_type: 'none',
           directions_options: { units: 'kilometers', language: 'fr-FR' },
           shape_format: 'polyline6'
         };
         if (Number.isInteger(options.alternates) && options.alternates > 0) payload.alternates = options.alternates;
-        const data = await apiJson('/route', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), options.timeoutMs || 32000);
+        let data;
+        try {
+          data = await apiJson('/route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+        } catch (err) {
+          if (err.name === 'AbortError') throw new Error('Le calcul a dépassé le délai. Réessaie ou rapproche les points.');
+          throw err;
+        } finally {
+          clearTimeout(timer);
+        }
         if (serial !== state.requestSerial) throw new Error('Requête remplacée par une plus récente.');
         return data;
       }
 
       async function fetchSingleRoute(serial, options = {}) {
-        return normalizeRoute(await fetchRouteData(serial, options), !!options.preserveWaypoints);
+        return normalizeRoute(await fetchRouteData(serial, options));
       }
 
       async function fetchRouteAlternatives(serial, options = {}) {
@@ -3333,7 +3288,7 @@
           interactive: false
         });
         const routeMain = L.polyline(latlngs, {
-          color: '#7c3aed',
+          color: state.sport === 'run' ? '#f04a89' : '#7c3aed',
           weight: 6,
           opacity: 1,
           lineJoin: 'round',
@@ -3353,7 +3308,7 @@
         resetElevationProfile();
         resetRoadTypeBreakdown();
         state.currentRoute = { distance: Number(route.distance) || 0, time: Number(route.time) || 0 };
-        if (!isRunning()) {
+        if (state.sport === 'bike') {
           updateNutritionAvailability();
           if (state.nutritionPlanActive) generateNutritionPlan();
           else resetNutritionPlan({ keepActive: true });
@@ -3379,7 +3334,7 @@
         updatePoiCounts();
         resetStats();
 
-        const colors = ['#7c3aed', '#db2777', '#4f46e5'];
+        const colors = state.sport === 'run' ? ['#e54e87', '#fb7185', '#c65adb'] : ['#7c3aed', '#db2777', '#4f46e5'];
         const layers = [];
         routes.forEach((route, index) => {
           const previewCoords = simplifyRouteDouglasPeucker(route.coords, window.innerWidth <= 850 ? 22 : 14);
@@ -3401,6 +3356,7 @@
           const labelMarker = L.marker(latlngs[markerIndex], {
             interactive: true,
             keyboard: true,
+            bubblingMouseEvents: false,
             icon: L.divIcon({
               className: '',
               html: `<div class="loop-preview-marker" style="color:${colors[index % colors.length]}">${index + 1}</div>`,
@@ -3574,10 +3530,16 @@
         updateUndoButton();
         const serial = ++state.requestSerial;
         renderRoute(route);
-        setStatus('Parcours calculé. Clique sur la carte pour ajouter des passages, ou fais glisser un point.', 'ok');
-        if (!isRunning()) {
-          loadPoisNearRoute(serial).catch(() => {});
-          auditRoute(route, serial).catch(() => { if (serial === state.requestSerial) setStatus('Contrôle du revêtement indisponible. Le GPX reste téléchargeable.', 'warn'); });
+        setStatus(state.sport === 'run' ? 'Parcours course à pied sélectionné' : `${route.label || 'Itinéraire'} sélectionné. Vérification du revêtement…`);
+        loadPoisNearRoute(serial).catch(() => {});
+        if (state.sport === 'bike') {
+          auditRoute(route, serial).catch((err) => {
+            if (serial === state.requestSerial) {
+              state.routeSafe = false;
+              els.gpxBtn.disabled = !state.routeCoords.length;
+              setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Le GPX reste disponible.`, 'warn');
+            }
+          });
           loadElevation(route, serial).catch(() => {});
         }
       }
@@ -3594,31 +3556,41 @@
       async function recalculateEditedRoute() {
         if (!canRoute()) return false;
         const serial = ++state.requestSerial;
-        setStatus('Recalcul du parcours avec tes points dans l’ordre d’ajout…');
+        clearRouteChoices();
+        setStatus('Recalcul du tracé modifié…');
         try {
           const currentWaypoints = cloneWaypoints(state.waypoints);
-          const requestWaypoints = cloneWaypoints(currentWaypoints);
-          const isRoundTripAB = state.mode === 'ab' && els.returnToStart?.checked;
+          let requestWaypoints = cloneWaypoints(currentWaypoints);
+          const isRoundTripAB = state.mode === 'ab' && els.returnToStart && els.returnToStart.checked;
           if (isRoundTripAB && requestWaypoints.length >= 2) {
             const first = requestWaypoints[0];
             const last = requestWaypoints[requestWaypoints.length - 1];
             if (haversineM(first, last) > 20) requestWaypoints.push({ lat: first.lat, lng: first.lng });
           }
-          const route = await fetchSingleRoute(serial, { waypoints: requestWaypoints, loop: state.mode === 'loop', preserveWaypoints: true });
-          if (serial !== state.requestSerial) return false;
+          const route = await fetchSingleRoute(serial, { waypoints: requestWaypoints, loop: state.mode === 'loop' });
           route.waypoints = currentWaypoints;
-          clearRouteChoices();
+          if (serial !== state.requestSerial) return false;
           renderRoute(route);
-          setStatus('Parcours recalculé avec les points dans le bon ordre.', 'ok');
-          if (!isRunning()) {
-            loadPoisNearRoute(serial).catch(() => {});
-            auditRoute(route, serial).catch(() => { if (serial === state.requestSerial) setStatus('Contrôle du revêtement indisponible. GPX disponible.', 'warn'); });
+          setStatus('Tracé modifié : parcours mis à jour', 'ok');
+          loadPoisNearRoute(serial).catch(() => {});
+          if (state.sport === 'bike') {
+            auditRoute(route, serial).catch((err) => {
+              if (serial === state.requestSerial) {
+                state.routeSafe = false;
+                els.gpxBtn.disabled = !state.routeCoords.length;
+                setStatus(`Contrôle du revêtement indisponible : ${err.message || 'erreur du service'}. Le GPX reste disponible.`, 'warn');
+              }
+            });
             loadElevation(route, serial).catch(() => {});
           }
           return true;
         } catch (err) {
           if (String(err.message).includes('remplacée')) return false;
-          if (serial === state.requestSerial) setStatus((err.message || 'Impossible de recalculer.') + ' Les points sont conservés : déplace-les ou réessaie.', 'error');
+          if (serial === state.requestSerial) {
+            // On conserve l'ancien tracé à l'écran : l'utilisateur peut
+            // déplacer à nouveau le point ou utiliser Annuler sans tout perdre.
+            setStatus((err.message || 'Impossible de recalculer cet itinéraire.') + ' L’ancien tracé reste affiché.', 'error');
+          }
           return false;
         }
       }
@@ -3800,92 +3772,98 @@
       }
 
       function abCalculateLabel() {
-        return els.returnToStart && els.returnToStart.checked ? 'Calculer un aller-retour' : (isRunning() ? 'Créer mon parcours à pied' : 'Calculer mon parcours');
+        return els.returnToStart && els.returnToStart.checked ? 'Calculer 3 allers-retours' : 'Calculer 3 itinéraires';
       }
 
-      async function resolveABEndpoints(serial) {
+      async function resolveABEndpoints({ serial } = {}) {
         const startQuery = els.startSearch.value.trim();
         const endQuery = els.endSearch.value.trim();
-        if (!startQuery) throw new Error('Indique une ville ou un départ sur la carte.');
-        if (!endQuery) throw new Error('Indique une ville ou une arrivée sur la carte.');
-        const existing = state.waypoints;
-        const oldStart = existing.length >= 1 ? existing[0] : null;
-        const oldEnd = existing.length >= 2 ? existing[existing.length - 1] : null;
-        const matches = (point, query) => !!point && point.searchValue === query && Number.isFinite(point.lat) && Number.isFinite(point.lng);
-        setStatus('Localisation du départ et de l’arrivée…');
-        const [start, end] = await Promise.all([
-          matches(oldStart, startQuery) ? Promise.resolve({ ...oldStart }) : geocode(startQuery).then(p => ({ ...p, searchValue: startQuery })),
-          matches(oldEnd, endQuery) ? Promise.resolve({ ...oldEnd }) : geocode(endQuery).then(p => ({ ...p, searchValue: endQuery, endpoint: 'end' }))
-        ]);
-        if (serial !== state.requestSerial) throw new Error('Requête remplacée par une plus récente.');
-        const sameLocations = matches(oldStart, startQuery) && matches(oldEnd, endQuery);
-        const middle = sameLocations ? existing.slice(1, -1).map(p => ({ ...p })) : [];
+        if (!startQuery) throw new Error('Saisissez une ville ou une adresse de départ.');
+        if (!endQuery) throw new Error('Saisissez une ville ou une adresse d’arrivée.');
+
+        setStatus('Recherche du départ et de l’arrivée…');
+        const startPromise = startQuery === 'Ma position' && state.currentLocation
+          ? Promise.resolve({ lat: state.currentLocation.lat, lng: state.currentLocation.lng, label: 'Ma position' })
+          : geocode(startQuery);
+        const [start, end] = await Promise.all([startPromise, geocode(endQuery)]);
+        if (serial != null && serial !== state.requestSerial) throw new Error('Requête remplacée par une plus récente.');
+
         rememberWaypoints();
-        state.waypoints = [start, ...middle, end];
+        state.waypoints = [start, end];
         refreshWaypointMarkers();
         return cloneWaypoints(state.waypoints);
       }
 
       async function generateABOptions({ silent = false } = {}) {
         if (state.mode !== 'ab') return false;
-        clearTimeout(state.recalcTimer);
-        const serial = ++state.requestSerial;
-        setBusy(els.calculateBtn, true, 'Calcul…');
-        let endpoints;
+        const roundTrip = !!els.returnToStart?.checked;
+        const isRun = state.sport === 'run';
+        const beginSerial = ++state.requestSerial;
+        if (!silent) setBusy(els.calculateBtn, true, 'Calcul en cours…');
+        setStatus('Recherche du départ et de l’arrivée…');
         try {
-          endpoints = await resolveABEndpoints(serial);
-          if (serial !== state.requestSerial) return false;
-          const roundTrip = !!els.returnToStart?.checked;
-          const requested = cloneWaypoints(endpoints);
-          if (roundTrip && requested.length >= 2) requested.push({ ...requested[0] });
-          const activityLabel = isRunning() ? 'à pied' : 'vélo de route';
-          setStatus(`Calcul du trajet ${activityLabel}…`);
-          // Toujours commencer par le trajet simple. La V42 attendait parfois
-          // de nombreux essais d'alternatives avant d'afficher quoi que ce soit.
-          const first = await fetchSingleRoute(serial, { waypoints: requested, loop: false });
-          if (serial !== state.requestSerial) return false;
-          first.waypoints = cloneWaypoints(endpoints);
-          setRouteOptions([first]);
-          setStatus('Trajet affiché. Tu peux cliquer sur la carte pour ajouter des points.', 'ok');
-          // Recherche facultative : ne doit ni masquer le trajet principal ni
-          // restaurer les anciens points si l'utilisateur commence à éditer.
-          if (!roundTrip && endpoints.length === 2) {
-            const activeSerial = state.requestSerial;
-            const activeActivity = state.activity;
-            fetchRouteAlternatives(activeSerial, { waypoints: requested, loop: false, alternates: 2 })
-              .then(routes => {
-                if (state.requestSerial !== activeSerial || state.activity !== activeActivity || !state.routeOptions.length) return;
-                routes.forEach(route => { route.waypoints = cloneWaypoints(endpoints); });
-                const choices = chooseThreeByDistance(distinctRoutes([first, ...routes]));
-                if (choices.length > 1) {
-                  setRouteOptions(choices);
-                  setStatus(`${choices.length} trajets proposés. Choisis celui qui te convient.`, 'ok');
+          const baseWaypoints = await resolveABEndpoints({ serial: beginSerial });
+          if (beginSerial !== state.requestSerial) return false;
+          if (roundTrip) {
+            // Tracé complet immédiatement; les variantes restent facultatives.
+            const complete = cloneWaypoints(baseWaypoints);
+            complete.push({ ...complete[0] });
+            const direct = await fetchSingleRoute(beginSerial, { waypoints: complete, loop: false });
+            direct.waypoints = cloneWaypoints(baseWaypoints);
+            if (beginSerial !== state.requestSerial) return false;
+            setRouteOptions([direct]);
+            setStatus('Aller-retour calculé : parcours disponible', 'ok');
+            if (!isRun) {
+              // En vélo, essayer deux retours différents EN ARRIÈRE-PLAN.
+              // L'aller-retour simple reste disponible même si le serveur refuse.
+              const optionSerial = state.requestSerial;
+              const patterns = [[0.11, 1, 0], [0.12, -1, 1]];
+              Promise.allSettled(patterns.map(async ([factor, side, variant]) => {
+                const wps = buildABRoundTripWaypoints(baseWaypoints[0], baseWaypoints[1], factor, side, variant);
+                const route = await fetchSingleRoute(optionSerial, { waypoints: wps, loop: false, timeoutMs: 13000 });
+                route.waypoints = cloneWaypoints(wps.slice(0, -1));
+                route.roundTripQuality = scoreABRoundTrip(route, baseWaypoints[0], baseWaypoints[1]);
+                return route;
+              })).then(results => {
+                if (optionSerial !== state.requestSerial || state.mode !== 'ab' || !els.returnToStart.checked || state.waypoints.length !== 2) return;
+                const candidates = [direct, ...results.filter(r => r.status === 'fulfilled').map(r => r.value)];
+                const clean = candidates.filter(r => r === direct || (r.roundTripQuality && r.roundTripQuality.clean));
+                const variants = chooseThreeByDistance(clean);
+                if (variants.length > 1) {
+                  setRouteOptions(variants);
+                  setStatus('Aller-retour : plusieurs variantes disponibles', 'ok');
                 }
-              })
-              .catch(() => { /* L'unique trajet déjà affiché reste utilisable. */ });
+              }).catch(() => {});
+            }
+            return true;
           }
+          // D'abord UN trajet simple (fiable), sans le paramètre alternates.
+          const direct = await fetchSingleRoute(beginSerial, { waypoints: baseWaypoints, loop: false });
+          direct.waypoints = cloneWaypoints(baseWaypoints);
+          if (beginSerial !== state.requestSerial) return false;
+          setRouteOptions([direct]);
+          setStatus(isRun ? 'Parcours course créé : sentiers autorisés' : 'Itinéraire vélo créé : routes revêtues');
+          // La recherche de variantes ne doit JAMAIS bloquer ou remplacer un
+          // tracé édité. Elle peut enrichir les choix après le premier affichage.
+          const optionSerial = state.requestSerial;
+          fetchRouteAlternatives(optionSerial, {
+            waypoints: baseWaypoints, loop: false, alternates: 2, timeoutMs: 13000
+          }).then(found => {
+            if (optionSerial !== state.requestSerial || state.mode !== 'ab' || state.waypoints.length !== 2) return;
+            for (const route of found) route.waypoints = cloneWaypoints(baseWaypoints);
+            const options = chooseThreeByDistance([direct, ...found]);
+            if (options.length > 1) {
+              setRouteOptions(options);
+              setStatus(`${options.length} itinéraires prêts : choisis ton préféré`);
+            }
+          }).catch(() => { /* trajet direct déjà affiché et téléchargeable */ });
           return true;
         } catch (err) {
-          if (serial !== state.requestSerial || String(err.message || '').includes('remplacée')) return false;
-          // Si le calcul simple échoue, essayer quand même l'API d'alternatives.
-          if (endpoints) {
-            try {
-              const requested = cloneWaypoints(endpoints);
-              if (els.returnToStart?.checked) requested.push({ ...requested[0] });
-              const routes = await fetchRouteAlternatives(serial, { waypoints: requested, loop: false, alternates: 1 });
-              if (serial !== state.requestSerial) return false;
-              routes.forEach(route => { route.waypoints = cloneWaypoints(endpoints); });
-              if (routes.length) {
-                setRouteOptions(routes);
-                setStatus('Parcours récupéré via le serveur de secours.', 'ok');
-                return true;
-              }
-            } catch (_) {}
-          }
-          if (serial === state.requestSerial) setStatus((err.message || 'Impossible de calculer ce parcours.') + ' Vérifie les adresses ou déplace un point sur la carte.', 'error');
+          if (beginSerial !== state.requestSerial || String(err.message).includes('remplacée')) return false;
+          setStatus(err.message || 'Le calcul a échoué. Vérifie les villes et réessaie.', 'error');
           return false;
         } finally {
-          setBusy(els.calculateBtn, false, abCalculateLabel());
+          if (!silent) setBusy(els.calculateBtn, false, isRun ? 'Calculer mon parcours' : abCalculateLabel());
         }
       }
 
@@ -4078,7 +4056,7 @@
         // Un premier calcul, puis au maximum une correction geometrique.
         // Cela evite de multiplier les appels au moteur tout en corrigeant
         // les ecarts typiques de 8 a 15 % causes par le reseau routier reel.
-        for (let round = 0; round < (isRunning() ? 1 : 2); round++) {
+        for (let round = 0; round < 2; round++) {
           const route = await fetchSingleRoute(serial, { waypoints, loop: true });
           if (serial !== state.requestSerial) throw new Error('requete remplacee');
           const actualKm = Math.max(0.1, (route.distance || 0) / 1000);
@@ -4148,21 +4126,67 @@
 
       async function resolveLoopStart() {
         const query = els.loopSearch.value.trim();
-        const old = state.waypoints[0];
-        if (query && old && old.searchValue === query && Number.isFinite(old.lat) && Number.isFinite(old.lng)) return { ...old };
         if (query && query !== 'Ma position') {
           setStatus('Recherche du départ de la boucle…');
-          const p = { ...(await geocode(query)), searchValue: query };
+          const p = await geocode(query);
           state.waypoints = [p];
           refreshWaypointMarkers();
           map.setView([p.lat, p.lng], 13);
           return p;
         }
         if (state.waypoints.length) return { ...state.waypoints[0] };
-        throw new Error('Indique un départ, utilise ta position ou clique sur la carte.');
+        throw new Error('Indiquez un départ, utilisez votre position ou cliquez une fois sur la carte.');
+      }
+
+      async function generateRunningLoop() {
+        const serial = ++state.requestSerial;
+        setBusy(els.generateLoopBtn, true, 'Création…');
+        try {
+          clearRouteChoices();
+          clearLoopPreviews();
+          if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
+          clearRouteTypeOverlay();
+          resetStats();
+          const start = await resolveLoopStart();
+          if (serial !== state.requestSerial) return false;
+          const targetKm = Math.max(2, Math.min(70, Number(els.loopDistance.value) || 10));
+          els.loopDistance.value = targetKm;
+          const choices = [];
+          // Varier les directions. Course à pied : les chemins non revêtus
+          // et sentiers forestiers sont routables en profil pedestrian.
+          for (let attempt = 0; attempt < 8 && choices.length < 3; attempt++) {
+            if (serial !== state.requestSerial) return false;
+            const wps = buildLoopWaypoints(start, targetKm, state.loopSeed + attempt * 7, attempt);
+            setStatus(`Recherche de boucles course… ${attempt + 1}/8`);
+            try {
+              const route = await fetchSingleRoute(serial, { waypoints: wps, loop: true, timeoutMs: 18000 });
+              route.waypoints = cloneWaypoints(wps);
+              if (!choices.some(prev => Math.abs(prev.distance - route.distance) < 180 && prev.encoded === route.encoded)) choices.push(route);
+            } catch (error) {
+              if (serial !== state.requestSerial) return false;
+            }
+          }
+          if (!choices.length) throw new Error('Impossible de créer une boucle ici. Essaie une autre ville ou distance.');
+          state.loopSeed += 11;
+          state.routeOptions = choices.sort((a,b) => Math.abs(a.distance - targetKm*1000) - Math.abs(b.distance - targetKm*1000));
+          state.routeOptions.forEach((r,i) => { r.label = `Boucle ${i+1}`; });
+          state.selectedRouteOption = -1;
+          state.waypoints = [start];
+          refreshWaypointMarkers();
+          renderRouteChoices();
+          renderLoopPreviews(state.routeOptions);
+          setStatus(`${state.routeOptions.length} boucle(s) course proposées`);
+          return true;
+        } catch (err) {
+          if (serial === state.requestSerial) setStatus(err.message || 'Impossible de créer les boucles', 'error');
+          return false;
+        } finally {
+          setBusy(els.generateLoopBtn, false, 'Créer des boucles');
+        }
       }
 
       async function generateLoop() {
+        if (state.sport === 'run') return generateRunningLoop();
         setBusy(els.generateLoopBtn, true, 'Création de 3 boucles…');
         const serial = ++state.requestSerial;
         try {
@@ -4182,12 +4206,10 @@
           const start = await resolveLoopStart();
           if (serial !== state.requestSerial) return false;
 
-          const targetKm = isRunning()
-            ? Math.min(80, Math.max(2, Number(els.loopDistance.value) || 10))
-            : Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
+          const targetKm = Math.min(350, Math.max(10, Number(els.loopDistance.value) || 80));
           els.loopDistance.value = targetKm;
           const candidates = [];
-          const maxAttempts = isRunning() ? 7 : 14;
+          const maxAttempts = 14;
 
           // V27 : on teste davantage d'orientations et on ne conserve que les
           // boucles sans portion significative en aller-retour.
@@ -4204,9 +4226,9 @@
 
               // Des que trois boucles vraiment propres et proches de la cible
               // existent, on s'arrete pour ne pas rallonger inutilement l'attente.
-              if (attempt >= (isRunning() ? 2 : 5)) {
+              if (attempt >= 5) {
                 const rankedNow = rankLoopCandidates(candidates, start, targetKm);
-                const clean = isRunning() ? rankedNow : rankedNow.filter(r => r.loopQuality && r.loopQuality.strictClean);
+                const clean = rankedNow.filter(r => r.loopQuality && r.loopQuality.strictClean);
                 const nearTarget = clean.filter(r => r.loopQuality.distanceErrorKm <= Math.max(2, targetKm * 0.05));
                 if (nearTarget.length >= 3) break;
               }
@@ -4222,7 +4244,7 @@
           // V27 : on n'affiche plus de boucle contenant un vrai aller-retour.
           // Si seulement une ou deux solutions propres existent, on prefere en
           // afficher moins plutot que d'inventer une troisieme mauvaise boucle.
-          const clean = isRunning() ? ranked : ranked.filter(r => r.loopQuality && r.loopQuality.strictClean);
+          const clean = ranked.filter(r => r.loopQuality && r.loopQuality.strictClean);
           if (!clean.length) {
             throw new Error('Aucune boucle sans aller-retour trouvée pour cette distance. Relancez : de nouvelles orientations seront testées.');
           }
@@ -4741,12 +4763,13 @@
           state.pois.cemetery.forEach(p => poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)} — eau potentielle</name><desc>Cimetière : présence et potabilité de l’eau à vérifier sur place.</desc><type>Eau potentielle - cimetière</type></wpt>`));
         }
         if (els.bakeryToggle.checked) state.pois.bakery.forEach(p => poiWpts.push(`  <wpt lat="${p.lat}" lon="${p.lng}"><name>${escapeXml(p.name)}</name><type>Boulangerie</type></wpt>`));
-        const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="RouteVelo" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>Itinéraire vélo de route</name></metadata>\n${poiWpts.join('\n')}\n  <trk><name>RouteVelo</name><type>Cyclisme route</type><trkseg>\n${track}\n  </trkseg></trk>\n</gpx>`;
+        const isRun = state.sport === 'run';
+        const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="VéloRun" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${isRun ? 'Parcours course à pied' : 'Itinéraire vélo de route'}</name></metadata>\n${poiWpts.join('\n')}\n  <trk><name>VéloRun</name><type>${isRun ? 'Course à pied' : 'Cyclisme route'}</type><trkseg>\n${track}\n  </trkseg></trk>\n</gpx>`;
         const blob = new Blob([gpx], { type: 'application/gpx+xml' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `route-velo-${new Date().toISOString().slice(0, 10)}.gpx`;
+        a.download = `velorun-${state.sport === 'run' ? 'course' : 'velo'}-${new Date().toISOString().slice(0, 10)}.gpx`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -4830,12 +4853,13 @@
       els.filterChevron.textContent = '+';
       setTimeout(positionUndoPointButton, 0);
 
-      // L'écran d'accueil doit rester visible à l'ouverture, mobile inclus.
-      // Le panneau d'édition s'ouvre après le choix du sport.
+      // Sur mobile, ouvrir l'itineraire au premier affichage pour guider l'utilisateur.
+      // L'accueil dédié remplace l'ancien tiroir mobile ouvert par défaut.
+      document.body.classList.remove('mobile-panel-open');
 
-      els.chooseBike?.addEventListener('click', () => chooseActivity('bike'));
-      els.chooseRun?.addEventListener('click', () => chooseActivity('run'));
-      els.changeActivityBtn?.addEventListener('click', showActivityHome);
+      els.chooseBike?.addEventListener('click', () => selectSport('bike'));
+      els.chooseRun?.addEventListener('click', () => selectSport('run'));
+      els.changeSportBtn?.addEventListener('click', goSportHome);
       els.modeAB.addEventListener('click', () => switchMode('ab'));
       els.modeLoop.addEventListener('click', () => switchMode('loop'));
       els.useLocationBtn.addEventListener('click', () => useCurrentLocation(els.useLocationBtn));
