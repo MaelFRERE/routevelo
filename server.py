@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""VéloRun local proxy/server. Standard-library only; no API key required."""
+"""RouteVelo local proxy/server. Standard-library only; no API key required."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ POI_LOCAL_TTL = {"water": 30 * 86400, "bakery": 10 * 86400, "cemetery": 30 * 864
 POI_STALE_RETENTION = 180 * 86400
 overpass_pick_lock = threading.Lock()
 overpass_pick_index = 0
-USER_AGENT = "VeloRun/1.0 (cycling and running route planner)"
+USER_AGENT = "RouteVelo-MVP/1.0 (local road-cycling route planner)"
 CLIENT_ID = "routevelo-mvp-local"
 
 
@@ -349,7 +349,7 @@ def post_valhalla(endpoint: str, payload):
                 method="POST",
                 payload=payload,
                 headers={"X-Client-Id": CLIENT_ID, "User-Agent": USER_AGENT},
-                timeout=13,
+                timeout=25,
             )[0]
         except RuntimeError as exc:
             last_error = exc
@@ -1572,7 +1572,7 @@ def valid_bbox(value):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "RouteVelo/4.2"
+    server_version = "RouteVelo/4.5"
 
     def _auth_token(self):
         return hmac.new(AUTH_SECRET.encode("utf-8"), b"routevelo-auth-v1", hashlib.sha256).hexdigest()
@@ -1591,7 +1591,7 @@ class Handler(BaseHTTPRequestHandler):
         message = f'<div class="error">{html.escape(error)}</div>' if error else ''
         page = f'''<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Connexion - VéloRun</title><style>
+<title>Connexion - RouteVelo</title><style>
 :root{{--bg:#faf7ff;--text:#261d31;--muted:#746a80;--line:#ebe4f2;--accent:#7c3aed;--soft:#f4efff}}
 *{{box-sizing:border-box}}body{{margin:0;min-height:100dvh;display:grid;place-items:center;padding:20px;background:var(--bg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text)}}
 .card{{width:min(100%,390px);background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 16px 44px rgba(76,29,149,.12)}}
@@ -1600,8 +1600,8 @@ h1{{font-size:22px;margin:0}}p{{margin:5px 0 0;color:var(--muted);font-size:13px
 input{{width:100%;min-height:50px;border:1px solid var(--line);border-radius:13px;padding:11px 13px;font:inherit;font-size:16px;outline:none}}input:focus{{border-color:#a78bfa;box-shadow:0 0 0 3px rgba(124,58,237,.12)}}
 button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;background:var(--accent);color:#fff;font:inherit;font-weight:800;cursor:pointer}}
 .error{{margin:0 0 14px;padding:10px 12px;border-radius:11px;background:#fff0f0;color:#9e2e2e;font-size:13px}}
-</style></head><body><main class="card"><div class="brand"><div class="icon">🚴🏃</div><div><h1>VéloRun</h1><p>Accès privé</p></div></div>{message}
-<form method="post" action="/login"><label for="password">Mot de passe</label><input id="password" name="password" type="password" autocomplete="current-password" autofocus required><button type="submit">Ouvrir VéloRun</button></form></main></body></html>'''
+</style></head><body><main class="card"><div class="brand"><div class="icon">🚴</div><div><h1>RouteVelo</h1><p>Accès privé</p></div></div>{message}
+<form method="post" action="/login"><label for="password">Mot de passe</label><input id="password" name="password" type="password" autocomplete="current-password" autofocus required><button type="submit">Ouvrir RouteVelo</button></form></main></body></html>'''
         raw = page.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -1725,48 +1725,54 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             return self.send_error_json("Recherche vide.", 400)
         if len(q) > 220:
             return self.send_error_json("Recherche trop longue.", 400)
+
+        cache_key = ("geocode-v45", unicodedata.normalize("NFKC", q).strip().casefold())
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            return self.send_json(cached)
+
+        # Nominatim primary + official French geocoder fallback. Both return
+        # real coordinates (we never silently replace a place with another).
+        errors = []
         try:
-            cache_key = ("geocode-v25", unicodedata.normalize("NFKC", q).strip().casefold())
-            cached = _cache_get(cache_key)
-            if cached is not None:
-                return self.send_json(cached)
-            # Nominatim d'abord, puis géocodage IGN en secours en cas de
-            # limitation/réponse vide. L'absence d'une API n'empêche pas A->B.
-            result = None
-            try:
-                nominatim_gate.wait()
-                query = urllib.parse.urlencode({
-                    "q": q, "format": "jsonv2", "limit": 1,
-                    "addressdetails": 1, "accept-language": "fr",
-                })
-                data, _ = upstream_json(
-                    NOMINATIM + "/search?" + query,
-                    headers={"User-Agent": USER_AGENT, "Referer": f"http://{HOST}:{self.server.server_port}/"},
-                    timeout=12,
-                )
-                if data:
-                    hit = data[0]
-                    result = {"lat": float(hit["lat"]), "lng": float(hit["lon"]), "label": hit.get("display_name") or q}
-            except (RuntimeError, ValueError, KeyError, IndexError, TypeError):
-                pass
-            if result is None:
-                try:
-                    params = urllib.parse.urlencode({"q": q, "limit": 1, "autocomplete": 0})
-                    data, _ = upstream_json(
-                        IGN_GEOCODER + "/search?" + params,
-                        headers={"User-Agent": USER_AGENT}, timeout=14,
-                    )
-                    feature = (data.get("features") or [])[0]
-                    coords = feature["geometry"]["coordinates"]
-                    result = {"lat": float(coords[1]), "lng": float(coords[0]), "label": feature.get("properties", {}).get("label") or q}
-                except (RuntimeError, ValueError, KeyError, IndexError, TypeError, AttributeError):
-                    return self.send_error_json("Ville introuvable ou services d'adresse indisponibles. Réessayez ou posez les points sur la carte.", 502)
-            _cache_put(cache_key, result)
-            return self.send_json(result)
-        except RuntimeError as exc:
-            return self.send_error_json(exc, 502)
-        except Exception:
-            return self.send_error_json("La recherche d’adresse a échoué.", 502)
+            nominatim_gate.wait()
+            query = urllib.parse.urlencode({
+                "q": q, "format": "jsonv2", "limit": 1,
+                "addressdetails": 1, "accept-language": "fr",
+            })
+            data, _ = upstream_json(
+                NOMINATIM + "/search?" + query,
+                headers={"User-Agent": USER_AGENT, "Referer": "https://routevelo.onrender.com/"},
+                timeout=15,
+            )
+            if isinstance(data, list) and data:
+                hit = data[0]
+                result = {"lat": float(hit["lat"]), "lng": float(hit["lon"]),
+                          "label": hit.get("display_name") or q}
+                _cache_put(cache_key, result)
+                return self.send_json(result)
+        except (RuntimeError, ValueError, KeyError, TypeError) as exc:
+            errors.append(str(exc))
+
+        try:
+            query = urllib.parse.urlencode({"q": q, "limit": 1})
+            data, _ = upstream_json(IGN_GEOCODER + "/search/?" + query, timeout=16)
+            features = data.get("features") if isinstance(data, dict) else None
+            if features:
+                hit = features[0]
+                coords = hit.get("geometry", {}).get("coordinates")
+                props = hit.get("properties") or {}
+                if isinstance(coords, list) and len(coords) >= 2:
+                    result = {"lat": float(coords[1]), "lng": float(coords[0]),
+                              "label": props.get("label") or props.get("name") or q}
+                    _cache_put(cache_key, result)
+                    return self.send_json(result)
+        except (RuntimeError, ValueError, KeyError, TypeError) as exc:
+            errors.append(str(exc))
+
+        if errors:
+            return self.send_error_json("Géocodage indisponible. Réessaie, ou place ton point directement sur la carte.", 502)
+        return self.send_error_json("Adresse introuvable. Essaie une ville voisine ou place ton point sur la carte.", 404)
 
     def handle_bakery_details(self):
         payload = read_json(self, 20_000)
@@ -1933,13 +1939,13 @@ def main():
     try:
         server = _make_server()
     except RuntimeError as exc:
-        print(f"Impossible de démarrer VéloRun: {exc}")
+        print(f"Impossible de démarrer RouteVelo: {exc}")
         input("Appuyez sur Entrée pour fermer...")
         return
 
     actual_port = server.server_port
     url = f"http://{HOST}:{actual_port}"
-    print(f"VéloRun démarré sur {url}")
+    print(f"RouteVelo démarré sur {url}")
     if actual_port != PORT:
         print(f"Le port {PORT} était occupé; utilisation automatique du port {actual_port}.")
     print("Protection par mot de passe activée." if APP_PASSWORD else "Protection par mot de passe désactivée (APP_PASSWORD non défini).")
@@ -1955,7 +1961,7 @@ def main():
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nArrêt de VéloRun.")
+        print("\nArrêt de RouteVelo.")
     finally:
         if opener:
             opener.cancel()

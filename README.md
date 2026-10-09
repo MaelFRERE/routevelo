@@ -1,6 +1,6 @@
-# VéloRun V45 — vélo de route & course à pied
+# RouteVelo V45
 
-Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
+Planificateur d’itinéraires **Vélo de route** et **Course à pied** : choix de l’activité sur l’écran d’accueil, boucles, itinéraires A→B / aller-retour, points manuels et export GPX.
 
 ## Utilisation locale
 
@@ -29,7 +29,7 @@ Quand `APP_PASSWORD` est défini, toutes les pages et toutes les API RouteVelo s
 ## Sources de données
 
 - Routage : Valhalla public / OpenStreetMap.
-- Géocodage : Nominatim.
+- Géocodage : Nominatim, avec secours Géoplateforme IGN pour les adresses françaises.
 - Points d’eau confirmés : Huwise/OpenDataSoft (données OSM).
 - Points d’eau potentiels et cimetières : IGN BD TOPO via le géocodeur Géoplateforme, avec secours OpenStreetMap/Overpass.
 - Boulangeries : fusion Huwise/OpenStreetMap + Annuaire des Entreprises / SIRENE.
@@ -298,15 +298,15 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - Second hôte Valhalla en secours pour les erreurs réseau temporaires.
 
 
-## V45 — Bilan, corrections et course à pied
+## V45 : accueil multisport + corrections générales
 
-- Accueil plein écran : deux cartes « Vélo de route » et « Course à pied », sans scroll.
-- Nouveau nom et logo VéloRun ; couleur violette pour le vélo, rose pour le run. Le même code serveur/API fonctionne pour les deux activités.
-- Course à pied : A → B, option aller-retour et boucles (2 à 70 km), Valhalla `pedestrian` pour autoriser sentiers, chemins forestiers et non-revêtus. Temps estimé : allure indicative de 6 min/km.
-- Course à pied : distance, temps, GPX et points utiles ; profil nutritionnel, D+/D− et types de voies masqués.
-- Vélo : Valhalla `bicycle` de type `Road`, surfaces à éviter, types de route colorés, altitude/D+/D−, nutrition et GPX préservés.
-- A → B : d'abord calcul direct sans alternatives pour garantir un itinéraire affiché dès que le moteur répond ; alternatives recherchées ensuite seulement, sans bloquer. Secours de géocodage IGN.
-- Points manuels : chaque clic ajoute un numéro à la fin, sans insertion au milieu, et recalcul. Deux clics suffisent pour poser le départ et l'arrivée depuis la carte.
-- Message d'état visible en couleur juste à côté du bouton « Itinéraire » sur la carte.
-- Déploiement inchangé : mêmes `server.py`, `render.yaml`, `requirements.txt` et `start.*`. La variable `APP_PASSWORD` reste valable.
-- Pas de clé API payante. Les calculs et POI nécessitent toujours l'accès aux services OpenStreetMap/Valhalla lors d'un premier passage.
+- Nouvel écran d’accueil avec deux cartes : **Vélo de route** (violet/rose) ou **Course à pied** (vert/turquoise). Pas de sélecteur de sport en haut des pages. Le bouton **Retour à l’accueil** permet de changer d’activité.
+- **Vélo** : profil Valhalla `bicycle`, type `Road`, évitement des mauvaises surfaces et pistes non adaptées. Conservation des 400 m pour les POI, des statistiques D+/D−, du profil d’élévation, du type de route, de la nutrition et de l’export GPX.
+- **Course à pied** : profil Valhalla natif `pedestrian`, autorisant les sentiers et chemins forestiers ; choix **Aller-retour** ou **Boucle**, distance et durée, export GPX. Pas de D+/D−, d’assistant nutrition ou de ventilation par type de route.
+- **Fiabilité A→B** : recherche d’abord l’itinéraire simple, l’affiche dès qu’il arrive, puis demande d’éventuelles alternatives sans retarder le premier tracé ; les erreurs sont désormais visibles dans la page (y compris sur mobile).
+- **Géocodage** : Nominatim avec secours IGN ; l’utilisateur peut aussi définir départ et arrivée en cliquant directement sur la carte sans saisir d’adresse.
+- **Points manuels** : chaque nouveau clic ajoute un point à la suite des étapes précédentes, avec un **numéro stable** (#3, #4, #5, #6…). Les étapes ne sont plus insérées près du numéro le plus proche. Sur A→B, la destination reste la dernière étape de calcul, mais conserve son numéro affiché.
+- **Recalcul** : utilise les coordonnées déplacées/ajoutées sans re-géocoder les anciens champs. L’export GPX reste disponible lorsque le parcours est affiché.
+- Tests : `python3 -m unittest discover -s tests -v`, validation `node --check` du JS, et essais dans Chromium avec des réponses d’API simulées.
+
+Les moteurs externes restent des services publics : leur disponibilité et la qualité réelle des itinéraires ne peuvent pas être garanties hors ligne. Vérifier les chemins, accès privés et interdictions avant de suivre un parcours à pied.
