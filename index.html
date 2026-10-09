@@ -1289,7 +1289,7 @@
     }
 
 
-    /* V42.2 — A→B fiable + ajout manuel strictement chronologique */
+    /* V42.1 — correction édition manuelle A→B */
     .manual-point-help { margin-top:2px; padding:9px 10px; border:1px dashed #dfcff5; border-radius:10px; background:#fbf8ff; color:#6f6680; line-height:1.4; }
     #map.route-edit-ready { cursor: crosshair; }
     .waypoint-marker.is-new { animation: waypointNewPulse .52s ease both; }
@@ -1299,6 +1299,25 @@
       100% { transform: scale(1); }
     }
 
+
+    /* V42.2 : statut visible sans refaire l'interface V42. */
+    .route-status {
+      position: absolute; z-index: 850; top: 14px; right: 14px;
+      max-width: min(420px, calc(100% - 112px));
+      padding: 10px 13px; border-radius: 13px;
+      font-size: 12px; line-height: 1.5; font-weight: 650;
+      background: rgba(255,255,255,.96);
+      border: 1px solid #e8d9fb; color: #5b378f;
+      box-shadow: 0 10px 28px rgba(76,29,149,.12);
+      pointer-events: none;
+    }
+    .route-status.ok { background: rgba(244,255,248,.97); color: #21734d; border-color: #c0ead0; }
+    .route-status.warn { background: rgba(255,250,231,.97); color: #8a5b12; border-color: #f2ddaa; }
+    .route-status.error { background: rgba(255,240,246,.98); color: #a72f55; border-color: #f3c4d3; }
+    .route-status.hidden { display: none !important; }
+    @media(max-width:850px) {
+      .route-status { top: 64px; left: 12px; right: 12px; max-width: none; font-size: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -1351,7 +1370,7 @@
         </div>
 
         <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer 3 itinéraires</button>
-        <div id="manualPointHelp" class="note manual-point-help">Après avoir choisi un trajet, clique directement sur la carte pour ajouter un point de passage. Tu peux aussi déplacer les points numérotés.</div>
+        <div id="manualPointHelp" class="note manual-point-help">A → B : saisis deux lieux ou clique deux fois sur la carte. Ensuite, chaque clic ajoute un nouveau point numéroté à la suite (même près du départ). Glisse un point pour le déplacer. Le GPX reste disponible.</div>
       </section>
 
       <a class="logout-link" href="/logout">Se déconnecter</a>
@@ -1369,6 +1388,7 @@
       <button id="desktopSidebarToggle" class="desktop-sidebar-toggle" type="button" aria-label="Rétracter le menu" aria-expanded="true">←</button>
       <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Ouvrir les réglages">☰ Itinéraire</button>
       <div id="map" aria-label="Carte de planification d’itinéraire"></div>
+      <div id="routeStatus" class="route-status hidden" role="status" aria-live="polite" aria-atomic="true"></div>
       <aside id="filterPanel" class="filter-panel collapsed" aria-label="Filtres de la carte">
         <button id="filterToggleBtn" class="filter-panel-head" type="button" aria-expanded="false" aria-controls="filterBody">
           <span><strong>Filtres</strong><small>Points utiles sur le trajet</small></span>
@@ -1599,6 +1619,7 @@
         mobileCloseBtn: document.getElementById('mobileCloseBtn'),
         mobileOverlay: document.getElementById('mobileOverlay'),
         routeChoices: document.getElementById('routeChoices'),
+        routeStatus: document.getElementById('routeStatus'),
         waypointList: document.getElementById('waypointList'),
         undoBtn: document.getElementById('undoBtn'),
         clearBtn: document.getElementById('clearBtn'),
@@ -1696,6 +1717,8 @@
         loopSeed: 0,
         recalcTimer: null,
         manualEditInProgress: false,
+        nextWaypointNumber: 3,
+        abGenerationToken: 0,
         requestSerial: 0
       };
 
@@ -1714,7 +1737,12 @@
       state.currentLocationLayer.addTo(map);
 
       function setStatus(message, kind = '') {
-        // Le contrôle de sécurité reste actif, mais son message n'est plus affiché dans le résumé.
+        // Le statut reste visible sur ordinateur comme sur téléphone,
+        // notamment lors d'une erreur de géocodage ou de routage.
+        if (!els.routeStatus) return;
+        const text = String(message || '').trim();
+        els.routeStatus.textContent = text;
+        els.routeStatus.className = 'route-status' + (kind ? ` ${kind}` : '') + (!text ? ' hidden' : '');
       }
 
       function setBusy(button, busy, label) {
@@ -2321,6 +2349,9 @@
           }
           return `<div class="nutrition-event"><div class="nutrition-event-time"><strong>${formatNutritionClock(event.minutes)}</strong><span>${km.toLocaleString('fr-FR',{maximumFractionDigits:1})} km · ${pct}%</span></div><div class="nutrition-event-main"><strong>${title}</strong><small>${detail}</small></div></div>`;
         }).join('');
+        if (!events.length) {
+          els.nutritionTimeline.innerHTML = '<div class="nutrition-event"><div class="nutrition-event-main"><strong>Sortie courte</strong><small>Aucune prise de ravitaillement programmée pendant cette durée. Adapte selon tes sensations et la météo.</small></div></div>';
+        }
         setNutritionWizardStep(3);
         return true;
       }
@@ -2461,10 +2492,11 @@
         clearAll();
       }
 
-      function markerIcon(i) {
+      function markerIcon(i, wp) {
+        const number = Number.isInteger(wp?.number) && wp.number > 0 ? wp.number : i + 1;
         return L.divIcon({
           className: '',
-          html: `<div class="waypoint-marker" data-waypoint-index="${i}">${i + 1}</div>`,
+          html: `<div class="waypoint-marker" data-waypoint-index="${i}" aria-label="Point ${number}">${number}</div>`,
           iconSize: [30, 30], iconAnchor: [15, 15]
         });
       }
@@ -2506,8 +2538,13 @@
         state.waypoints = state.waypointHistory.pop().map(p => ({ ...p }));
         updateUndoButton();
         refreshWaypointMarkers();
-        clearRouteOnly();
+        state.manualEditInProgress = true;
+        if (state.mode === 'ab' && state.waypoints.length >= 2) {
+          markEndpointOnMap(0);
+          markEndpointOnMap(state.waypoints.length - 1);
+        }
         if (canRoute()) scheduleRecalc();
+        else clearRouteOnly();
       }
 
       function nearestPointOnRoute(point) {
@@ -2556,7 +2593,7 @@
           // Pendant une édition, le marqueur doit rester exactement là où
           // l'utilisateur l'a posé. Il ne sera recollé au NOUVEAU tracé
           // qu'une fois le recalcul terminé avec succès.
-          const marker = L.marker([wp.lat, wp.lng], { draggable: true, icon: markerIcon(i), autoPan: true }).addTo(map);
+          const marker = L.marker([wp.lat, wp.lng], { draggable: true, icon: markerIcon(i, wp), autoPan: true }).addTo(map);
           marker.on('dragstart', () => {
             state.manualEditInProgress = true;
             marker.setZIndexOffset(2500);
@@ -2566,8 +2603,11 @@
           marker.on('dragend', () => {
             const p = marker.getLatLng();
             rememberWaypoints();
-            state.waypoints[i] = { lat: p.lat, lng: p.lng };
+            state.waypoints[i] = { ...state.waypoints[i], lat: p.lat, lng: p.lng };
             state.manualEditInProgress = true;
+            if (state.mode === 'ab' && (i === 0 || i === state.waypoints.length - 1)) {
+              markEndpointOnMap(i);
+            }
             renderWaypointList();
             marker.setZIndexOffset(2500);
             animateWaypointDropped(marker);
@@ -2588,13 +2628,14 @@
         state.waypoints.forEach((wp, i) => {
           const row = document.createElement('div');
           row.className = 'waypoint-row';
-          row.innerHTML = `<span class="waypoint-index">${i + 1}</span><span class="coord">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</span><button type="button" class="icon-btn" aria-label="Supprimer le point ${i + 1}">✕</button>`;
+          row.innerHTML = `<span class="waypoint-index">${wp.number || i + 1}</span><span class="coord">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</span><button type="button" class="icon-btn" aria-label="Supprimer le point ${wp.number || i + 1}">✕</button>`;
           row.querySelector('button').addEventListener('click', () => {
             rememberWaypoints();
             state.waypoints.splice(i, 1);
+            state.manualEditInProgress = true;
             refreshWaypointMarkers();
-            clearRouteOnly();
             if (canRoute()) scheduleRecalc();
+            else clearRouteOnly();
           });
           els.waypointList.appendChild(row);
         });
@@ -2608,6 +2649,8 @@
       }
 
       function clearRouteOnly() {
+        ++state.requestSerial;
+        clearTimeout(state.recalcTimer);
         clearLoopPreviews();
         state.manualEditInProgress = false;
         document.getElementById('map')?.classList.remove('route-edit-ready');
@@ -2632,7 +2675,9 @@
       }
 
       function clearAll() {
+        state.nextWaypointNumber = 3;
         state.waypoints = [];
+        for (const input of [els.startSearch, els.endSearch]) if (input) delete input.dataset.pointOnMap;
         state.waypointHistory = [];
         updateUndoButton();
         state.markers.forEach(m => map.removeLayer(m));
@@ -2678,36 +2723,56 @@
         return state.mode === 'ab' && !isRoundTripAB ? Math.max(1, state.waypoints.length - 1) : state.waypoints.length;
       }
 
-      function addPoint(latlng) {
-        const wp = { lat: latlng.lat, lng: latlng.lng };
+      function markEndpointOnMap(index) {
+        const input = index === 0 ? els.startSearch : els.endSearch;
+        if (!input || !state.waypoints.length) return;
+        input.value = index === 0 ? 'Départ sur la carte' : 'Arrivée sur la carte';
+        input.dataset.pointOnMap = '1';
+      }
 
-        // V42.2 : un nouveau clic est TOUJOURS le point suivant.
-        // On ne renumerote plus les anciens points selon la proximité du tracé.
-        // Exemple : après le point 5, même un clic à côté du point 1 crée le point 6.
-        if (state.routeLayer && state.routeCoords.length >= 2 && state.waypoints.length >= 2) {
+      function addPoint(latlng) {
+        const wp = { lat: Number(latlng.lat), lng: Number(latlng.lng), number: state.nextWaypointNumber++ };
+        if (!Number.isFinite(wp.lat) || !Number.isFinite(wp.lng)) return;
+        if (state.waypoints.length >= 2) {
           rememberWaypoints();
-          const addedIndex = state.waypoints.length;
-          state.waypoints.push(wp);
+          // L'ordre des passages suit les clics, pas leur proximité avec un
+          // ancien segment. Les numéros ne changent plus après insertion.
+          // En A -> B, l'arrivée conserve sa place de dernier point visité.
+          const insertAt = state.mode === 'ab' ? state.waypoints.length - 1 : state.waypoints.length;
+          state.waypoints.splice(insertAt, 0, wp);
           state.manualEditInProgress = true;
           refreshWaypointMarkers();
-          const addedMarker = state.markers[addedIndex];
-          const node = waypointMarkerNode(addedMarker);
+          const marker = state.markers[insertAt];
+          const node = waypointMarkerNode(marker);
           if (node) {
             node.classList.add('is-new', 'is-selected');
             setTimeout(() => node.classList.remove('is-new', 'is-selected'), 620);
           }
-          setStatus(`Point ${addedIndex + 1} ajouté à la fin. Recalcul du trajet…`);
+          setStatus(`Point ${wp.number} ajouté. Recalcul du trajet…`);
           scheduleRecalc();
           return;
         }
-
-        // Avant de generer une boucle, un clic peut toujours definir son depart.
+        if (state.mode === 'ab') {
+          rememberWaypoints();
+          wp.number = state.waypoints.length + 1;
+          state.waypoints.push(wp);
+          if (state.waypoints.length === 1) markEndpointOnMap(0);
+          else { markEndpointOnMap(1); state.nextWaypointNumber = 3; }
+          refreshWaypointMarkers();
+          state.manualEditInProgress = true;
+          if (canRoute()) {
+            setStatus('Départ et arrivée placés. Calcul du parcours…');
+            scheduleRecalc();
+          } else setStatus('Départ placé : clique une seconde fois pour définir l’arrivée.');
+          return;
+        }
         if (state.mode === 'loop' && !state.routeOptions.length) {
           rememberWaypoints();
+          wp.number = 1;
           state.waypoints = [wp];
           els.loopSearch.value = '';
           refreshWaypointMarkers();
-          clearRouteOnly();
+          setStatus('Départ de boucle placé. Choisis une distance, puis lance les 3 boucles.');
         }
       }
 
@@ -2715,25 +2780,14 @@
         clearTimeout(state.recalcTimer);
         state.recalcTimer = setTimeout(() => {
           if (!canRoute()) return;
-          // Dès qu'un tracé existe (ou qu'un point vient d'être manipulé),
-          // on recalcule à partir des coordonnées réellement présentes sur
-          // la carte. L'ancienne V42 relançait le géocodage avec seulement
-          // 2 points et pouvait donc annuler un déplacement manuel.
-          if (state.routeLayer || state.routeCoords.length || state.manualEditInProgress || state.waypoints.length > 2) {
-            recalculateEditedRoute().catch(() => {});
-          } else if (state.mode === 'ab') {
-            generateABOptions({ silent: true }).catch(() => {});
-          } else {
-            recalculateEditedRoute().catch(() => {});
-          }
-        }, 260);
+          recalculateEditedRoute().catch(err => setStatus(err?.message || 'Recalcul impossible.', 'error'));
+        }, 280);
       }
 
-      // Après calcul, chaque clic ajoute le point suivant (ordre chronologique) et modifie le tracé.
+      // Apres calcul, un clic sur la carte ajoute un point de passage et modifie le trace.
       // Pendant l'aperçu des 3 boucles, on attend d'abord que l'utilisateur en choisisse une.
       map.on('click', e => {
         if (state.mode === 'loop' && state.loopPreviewLayer && state.selectedRouteOption < 0) return;
-        if (!state.routeLayer || !state.routeCoords.length) return;
         addPoint(e.latlng);
       });
 
@@ -2818,6 +2872,7 @@
           if (state.waypoints.length === 0) state.waypoints.push({ ...p });
           else state.waypoints[0] = { ...p };
           els.startSearch.value = 'Ma position';
+          delete els.startSearch.dataset.pointOnMap;
         } else {
           state.waypoints = [{ ...p }];
           els.loopSearch.value = 'Ma position';
@@ -3022,7 +3077,7 @@
         };
       }
 
-      function normalizeTrip(trip, raw) {
+      function normalizeTrip(trip, raw, preserveWaypoints = false) {
         if (!trip || !trip.summary || !Array.isArray(trip.legs) || !trip.legs.length) throw new Error('Le moteur n’a renvoyé aucun itinéraire.');
         const coords = [];
         trip.legs.forEach(leg => {
@@ -3036,17 +3091,18 @@
           });
         });
         if (coords.length < 2) throw new Error('La géométrie du trajet est vide.');
-        return removeSmallRouteDetours({
+        const normalized = {
           distance: Number(trip.summary.length) * 1000,
           time: Number(trip.summary.time) * 1000,
           coords,
           encoded: encodePolyline6(coords),
           raw
-        });
+        };
+        return preserveWaypoints ? normalized : removeSmallRouteDetours(normalized);
       }
 
-      function normalizeRoute(data) {
-        return normalizeTrip(data && data.trip, data);
+      function normalizeRoute(data, options = {}) {
+        return normalizeTrip(data && data.trip, data, !!options.preserveWaypoints);
       }
 
       function normalizeRouteSet(data) {
@@ -3062,7 +3118,7 @@
       }
 
       function cloneWaypoints(points) {
-        return points.map(p => ({ lat: p.lat, lng: p.lng, ...(p.label ? { label: p.label } : {}) }));
+        return points.map(p => ({ lat: p.lat, lng: p.lng, ...(p.label ? { label: p.label } : {}), ...(p.number ? { number: p.number } : {}) }));
       }
 
       function distinctRoutes(routes) {
@@ -3101,7 +3157,7 @@
       }
 
       async function fetchSingleRoute(serial, options = {}) {
-        return normalizeRoute(await fetchRouteData(serial, options));
+        return normalizeRoute(await fetchRouteData(serial, options), options);
       }
 
       async function fetchRouteAlternatives(serial, options = {}) {
@@ -3363,6 +3419,8 @@
         renderRouteChoices();
         if (Array.isArray(route.waypoints) && route.waypoints.length) {
           state.waypoints = cloneWaypoints(route.waypoints);
+          state.waypoints.forEach((wp, i) => { if (!wp.number) wp.number = i + 1; });
+          state.nextWaypointNumber = Math.max(3, ...state.waypoints.map(p => p.number + 1));
           refreshWaypointMarkers();
         }
         state.waypointHistory = [];
@@ -3404,7 +3462,7 @@
             const last = requestWaypoints[requestWaypoints.length - 1];
             if (haversineM(first, last) > 20) requestWaypoints.push({ lat: first.lat, lng: first.lng });
           }
-          const route = await fetchSingleRoute(serial, { waypoints: requestWaypoints, loop: state.mode === 'loop' });
+          const route = await fetchSingleRoute(serial, { waypoints: requestWaypoints, loop: state.mode === 'loop', preserveWaypoints: true });
           route.waypoints = currentWaypoints;
           if (serial !== state.requestSerial) return false;
           renderRoute(route);
@@ -3580,9 +3638,9 @@
           const requestWaypoints = buildABRoundTripWaypoints(start, end, factor, side, variant);
           const editableWaypoints = cloneWaypoints(requestWaypoints.slice(0, -1));
           try {
-            const found = i === 0
-              ? await fetchRouteAlternatives(serial, { waypoints: requestWaypoints, loop: false, alternates: 2 })
-              : [await fetchSingleRoute(serial, { waypoints: requestWaypoints, loop: false })];
+            // Valhalla ne prend pas en charge les alternatives sur un trajet
+            // avec plus de deux locations. Chaque variante est déjà un trajet.
+            const found = [await fetchSingleRoute(serial, { waypoints: requestWaypoints, loop: false })];
             for (const route of found) {
               route.waypoints = cloneWaypoints(editableWaypoints);
               route.roundTripQuality = scoreABRoundTrip(route, start, end);
@@ -3606,102 +3664,128 @@
         return chooseThreeByDistance(top);
       }
 
+      async function enrichABAlternatives(baseWaypoints, initialRoutes, serial) {
+        const activeRoute = state.routeOptions[state.selectedRouteOption];
+        const activeEncoded = activeRoute?.encoded;
+        let pool = distinctRoutes(initialRoutes);
+        // Une seule tentative officielle, puis deux variantes seulement si besoin.
+        const tryRequest = async (opts, useAlternates = false) => {
+          if (serial !== state.requestSerial || state.manualEditInProgress || state.mode !== 'ab') return;
+          try {
+            const results = useAlternates
+              ? await fetchRouteAlternatives(serial, opts)
+              : [await fetchSingleRoute(serial, opts)];
+            if (serial !== state.requestSerial || state.manualEditInProgress) return;
+            for (const candidate of results) {
+              candidate.waypoints = cloneWaypoints(baseWaypoints);
+              pool = distinctRoutes([...pool, candidate]);
+            }
+            if (pool.length < 2) return;
+            const chosen = chooseThreeByDistance(pool);
+            chosen.forEach((r, index) => { r.label = routeChoiceLabel(index, chosen.length); });
+            state.routeOptions = chosen;
+            state.selectedRouteOption = Math.max(0, chosen.findIndex(r => r.encoded === activeEncoded));
+            renderRouteChoices();
+            setStatus(chosen.length >= 3
+              ? '3 itinéraires disponibles. Clique sur Court, Moyen ou Long pour comparer.'
+              : `${chosen.length} itinéraires disponibles.`, 'ok');
+          } catch (_) { /* Le parcours principal reste utilisable. */ }
+        };
+        await tryRequest({ waypoints: baseWaypoints, loop: false, alternates: 2 }, true);
+        if (pool.length >= 3 || serial !== state.requestSerial) return;
+        for (const [factor, side] of [[0.10, 1], [0.10, -1]]) {
+          if (serial !== state.requestSerial || pool.length >= 3) break;
+          await tryRequest({ waypoints: buildABDetourWaypoints(baseWaypoints[0], baseWaypoints[1], factor, side), loop: false });
+        }
+      }
+
       function abCalculateLabel() {
         return els.returnToStart && els.returnToStart.checked ? 'Calculer 3 allers-retours' : 'Calculer 3 itinéraires';
       }
 
-      async function resolveABEndpoints() {
-        const startQuery = els.startSearch.value.trim();
-        const endQuery = els.endSearch.value.trim();
-        if (!startQuery) throw new Error('Saisissez une ville ou une adresse de départ.');
-        if (!endQuery) throw new Error('Saisissez une ville ou une adresse d’arrivée.');
-
+      async function resolveABEndpoints(serial = state.requestSerial) {
+        const fields = [els.startSearch, els.endSearch];
+        const values = fields.map(el => el.value.trim());
+        const previous = state.waypoints;
+        const endpoint = i => i === 0 ? previous[0] : previous[previous.length - 1];
+        for (let i = 0; i < 2; i++) {
+          if (!values[i] && !(endpoint(i) && fields[i].dataset.pointOnMap === '1')) {
+            throw new Error(i === 0 ? 'Saisis un départ ou clique sur la carte.' : 'Saisis une arrivée ou clique sur la carte.');
+          }
+        }
         setStatus('Recherche du départ et de l’arrivée…');
-        const startPromise = startQuery === 'Ma position' && state.currentLocation
-          ? Promise.resolve({ lat: state.currentLocation.lat, lng: state.currentLocation.lng, label: 'Ma position' })
-          : geocode(startQuery);
-        const [start, end] = await Promise.all([startPromise, geocode(endQuery)]);
-
+        const points = await Promise.all(fields.map(async (field, i) => {
+          if (field.dataset.pointOnMap === '1' && endpoint(i) &&
+              (i === 0 ? values[i] === 'Départ sur la carte' : values[i] === 'Arrivée sur la carte')) {
+            return { ...endpoint(i) };
+          }
+          if (i === 0 && values[i] === 'Ma position' && state.currentLocation) {
+            return { lat: state.currentLocation.lat, lng: state.currentLocation.lng, label: 'Ma position' };
+          }
+          return geocode(values[i]);
+        }));
+        if (serial !== state.requestSerial) throw new Error('Requête remplacée par une plus récente.');
+        if (haversineM(points[0], points[1]) < 15) throw new Error('Départ et arrivée sont au même endroit : choisis deux points distincts.');
         rememberWaypoints();
-        state.waypoints = [start, end];
+        state.waypoints = [{ ...points[0], number: 1 }, { ...points[1], number: 2 }];
+        state.nextWaypointNumber = 3;
+        state.manualEditInProgress = false;
         refreshWaypointMarkers();
         return cloneWaypoints(state.waypoints);
       }
 
       async function generateABOptions({ silent = false } = {}) {
         if (state.mode !== 'ab') return false;
+        clearTimeout(state.recalcTimer);
+        const serial = ++state.requestSerial; // Avant le géocodage, pour invalider les recherches précédentes.
+        const operation = ++state.abGenerationToken;
+        if (!silent) setBusy(els.calculateBtn, true, 'Calcul en cours…');
         let baseWaypoints;
         try {
-          baseWaypoints = await resolveABEndpoints();
-        } catch (err) {
-          setStatus(err.message || 'Impossible de trouver le départ ou l’arrivée.', 'error');
-          return false;
-        }
-        const serial = ++state.requestSerial;
-        if (!silent) setBusy(els.calculateBtn, true, 'Recherche…');
-        const roundTrip = !!(els.returnToStart && els.returnToStart.checked);
-        setStatus(roundTrip ? 'Recherche de 3 allers-retours avec retour différent…' : 'Recherche de 3 itinéraires vélo de route…');
-        try {
-          let routes;
+          baseWaypoints = await resolveABEndpoints(serial);
+          if (serial !== state.requestSerial) return false;
+          const roundTrip = !!els.returnToStart?.checked;
+          setStatus(roundTrip ? 'Création des allers-retours…' : 'Calcul du parcours A → B…');
           if (roundTrip) {
-            routes = await generateABRoundTripRoutes(serial, baseWaypoints);
-          } else {
-            // V42.2 : on sécurise d'abord le trajet A→B simple. La recherche
-            // d'alternatives vient ensuite et ne peut plus empêcher l'affichage
-            // du trajet principal si le serveur public refuse les alternatives.
-            const direct = await fetchSingleRoute(serial, { waypoints: baseWaypoints, loop: false });
-            direct.waypoints = cloneWaypoints(baseWaypoints);
-            routes = [direct];
-            try {
-              const alternatives = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 });
-              alternatives.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
-              routes = distinctRoutes([...routes, ...alternatives]);
-            } catch (_) {
-              // Le trajet direct reste valide et utilisable.
-            }
-            routes.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
-            routes = distinctRoutes(routes);
-
-            // Certains serveurs ou certaines zones renvoient moins de 3 alternatives.
-            // Dans ce cas, on construit des détours routables progressifs puis on trie par distance réelle.
-            if (routes.length < 3 && baseWaypoints.length === 2) {
-              const patterns = [
-                [0.10, 1], [0.10, -1], [0.18, 1], [0.18, -1], [0.28, 1], [0.28, -1]
-              ];
-              for (const [factor, side] of patterns) {
-                if (routes.length >= 3) break;
-                const detourWaypoints = buildABDetourWaypoints(baseWaypoints[0], baseWaypoints[1], factor, side);
-                try {
-                  const route = await fetchSingleRoute(serial, { waypoints: detourWaypoints, loop: false });
-                  // Les points de détour servent uniquement à fabriquer une
-                  // alternative. Ils ne doivent pas apparaître comme des points
-                  // ajoutés par l'utilisateur, sinon l'édition manuelle devient incohérente.
-                  route.waypoints = cloneWaypoints(baseWaypoints);
-                  routes = distinctRoutes([...routes, route]);
-                } catch (_) {}
-              }
-            }
+            const routes = await generateABRoundTripRoutes(serial, baseWaypoints);
+            if (serial !== state.requestSerial) return false;
+            if (!routes.length) throw new Error('Aucun aller-retour routable trouvé. Essaie une autre destination.');
+            setRouteOptions(routes);
+            setStatus(`${routes.length} aller${routes.length > 1 ? 's' : ''}-retour${routes.length > 1 ? 's' : ''} disponible${routes.length > 1 ? 's' : ''}.`, 'ok');
+            return true;
           }
-
-          const chosen = chooseThreeByDistance(routes);
-          if (!chosen.length) throw new Error('Aucun itinéraire routable trouvé.');
-          setRouteOptions(chosen);
-          if (chosen.length < 3) {
-            setStatus(`${chosen.length} proposition${chosen.length > 1 ? 's' : ''} trouvée${chosen.length > 1 ? 's' : ''}. Le réseau local n’a pas fourni 3 tracés distincts.`, 'warn');
+          let routes = [];
+          let primaryError = null;
+          try {
+            routes = [await fetchSingleRoute(serial, { waypoints: baseWaypoints, loop: false })];
+          } catch (err) {
+            primaryError = err;
+            if (serial !== state.requestSerial) return false;
+            try { routes = await fetchRouteAlternatives(serial, { waypoints: baseWaypoints, loop: false, alternates: 2 }); }
+            catch (_) { throw primaryError; }
+          }
+          if (serial !== state.requestSerial) return false;
+          routes = distinctRoutes(routes);
+          if (!routes.length) throw primaryError || new Error('Le service vélo n’a renvoyé aucun tracé.');
+          routes.forEach(route => { route.waypoints = cloneWaypoints(baseWaypoints); });
+          // Ne jamais retarder l’affichage de la première route pour rechercher 3 options.
+          setRouteOptions(routes);
+          const shownSerial = state.requestSerial;
+          setStatus('Parcours prêt. Clique sur la carte pour ajouter tes points ; recherche des variantes…', 'ok');
+          if (routes.length < 3) {
+            enrichABAlternatives(baseWaypoints, routes, shownSerial).catch(() => {});
           }
           return true;
         } catch (err) {
-          if (String(err.message).includes('remplacée')) return false;
-          if (serial === state.requestSerial) {
-            if (state.routeLayer) { map.removeLayer(state.routeLayer); state.routeLayer = null; }
-            clearRouteTypeOverlay();
-            resetStats();
-            clearRouteChoices();
-            setStatus(err.message || 'Impossible de calculer les itinéraires.', 'error');
+          if (serial !== state.requestSerial) return false;
+          const msg = err?.message || 'Calcul impossible.';
+          if (!String(msg).includes('remplacée')) {
+            setStatus(`A → B : ${msg} Vérifie les lieux et réessaie.`, 'error');
           }
+          // L’ancien parcours reste affiché en cas d’échec.
           return false;
         } finally {
-          if (!silent) setBusy(els.calculateBtn, false, abCalculateLabel());
+          if (operation === state.abGenerationToken && !silent) setBusy(els.calculateBtn, false, abCalculateLabel());
         }
       }
 
@@ -4700,6 +4784,7 @@
       els.undoPointBtn.addEventListener('click', undoLastWaypointChange);
       els.clearBtn.addEventListener('click', clearAll);
       [els.startSearch, els.endSearch].forEach(input => {
+        input.addEventListener('input', () => { delete input.dataset.pointOnMap; });
         input.addEventListener('keydown', e => {
           if (e.key !== 'Enter') return;
           closeMobilePanel();

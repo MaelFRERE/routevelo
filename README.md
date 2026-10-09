@@ -298,8 +298,18 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - Second hôte Valhalla en secours pour les erreurs réseau temporaires.
 
 
-## V42.2 - ordre des points + A→B fiabilisé
+## V42.2 — réparation générale (sans refonte V43/V44)
 
-- Chaque clic manuel ajoute toujours le point suivant à la fin : après le point 5, le prochain est toujours le point 6, même si le clic est proche du point 1.
-- Suppression de l'insertion automatique basée sur la proximité du tracé pour les nouveaux clics.
-- Le calcul A→B tente désormais le trajet direct en premier ; les alternatives sont ajoutées ensuite et ne peuvent plus bloquer le trajet principal.
+- Départ → arrivée : la route normale est calculée et affichée d'abord. Des variantes sont recherchées ensuite sans bloquer l'affichage et sans effacer la route courante en cas d'échec.
+- L'ajout manuel à la carte fonctionne aussi **avant** le premier calcul : premier clic = départ, deuxième clic = arrivée, puis recalcul automatique.
+- Après le calcul, chaque clic ajoute un point de passage **dans l'ordre des clics**, avec son **numéro permanent** (ex. 6 reste 6 même s'il est placé près du point 1). Les coordonnées sont transmises telles quelles au calcul.
+- Le déplacement des marqueurs, la suppression et le bouton Annuler utilisent les coordonnées éditées, sans réutiliser les anciennes valeurs des champs d'adresse. Si un recalcul échoue, le tracé précédent est conservé.
+- Les points de passage posés manuellement ne sont pas supprimés par le nettoyage des micro-détours pendant leur recalcul.
+- Le statut du calcul et les messages d'erreur sont désormais **visibles sur la carte** (PC et mobile).
+- Géocodage : secours Géoplateforme IGN si Nominatim ne répond pas, avec message clair si les deux sources échouent.
+- Meilleure gestion des délais et des erreurs réseau du moteur de routage ; pas d'alternatives Valhalla sur des requêtes à étapes multiples.
+- GPX toujours exportable lorsqu'un trajet existe ; les filtres POI restent à 400 m du tracé.
+- Les petites sorties reçoivent un message nutrition explicite quand aucun arrêt ne nécessite d'être programmé.
+- Tests hors-ligne inclus : `python -m unittest discover -s tests -v`. Tests d'interface également réalisés sur navigateur avec services externes simulés.
+
+**Important :** la géométrie réelle et les alternatives dépendent toujours du service public Valhalla. Les tests hors ligne vérifient le comportement de l'app mais ne prouvent pas la disponibilité du service public à un instant donné.
