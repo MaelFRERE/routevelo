@@ -1,6 +1,22 @@
-# RouteVelo V42.2
+# RouteVelo V45
 
-Planificateur d'itinéraires pour vélo de route avec itinéraires alternatifs, boucles, export GPX, eau potable, cimetières et boulangeries.
+Planificateur d'itinéraires **vélo de route et course à pied** avec écran de choix de l'activité, trajets A → B, allers-retours, boucles et export GPX. Le projet est basé sur la V42.1 corrigée, sans le design V43/V44.
+
+
+## V45 — maintenance générale et course à pied
+
+- **Écran d’accueil** : choix entre vélo de route et course à pied. Le bouton « Choisir une autre activité » revient à l'accueil et réinitialise la planification.
+- **Vélo** : les paramètres `bicycle_type=Road`, `avoid_bad_surfaces=1`, `use_tracks=0` restent appliqués. Points d'eau/cimetières, boulangeries, informations de revêtement, profil d'altitude et nutrition restent réservés au vélo.
+- **Course à pied** : routage Valhalla `pedestrian` qui accepte les chemins forestiers, sentiers et pistes praticables à pied. Vitesse de référence pour l'estimation : 8,5 km/h. A → B, case « Faire un aller-retour », ou boucle de 2 à 80 km. Interface simplifiée : distance, durée, choix de trajet et export GPX ; sans plan nutritionnel, sans D+/D− ni ventilation du type de route.
+- **Réparation A → B** : première réponse routable affichée tout de suite ; les alternatives sont facultatives et n'empêchent jamais d'utiliser le premier tracé. Une erreur d'adresse ou de routage apparaît désormais en clair dans la barre latérale et sur la carte, y compris sur téléphone.
+- **Points manuels** : un clic sur la carte peut poser le départ, puis l'arrivée, sans géocodage. Les clics suivants ajoutent les passages chronologiquement : D, 1, 2, 3, etc., puis A en fin de parcours. Le point 6 garde le numéro 6 même s'il est géographiquement près du point 1. Le tracé est recalculé sans perdre les points. L'annulation et le déplacement restent disponibles.
+- **Géocodage** : recherche Nominatim avec repli automatique sur le service IGN (sans clé). L'adresse saisie n'est pas recherchée une nouvelle fois si elle correspond déjà à un point géolocalisé, notamment après déplacement manuel.
+- **Synchronisation** : les anciens résultats d'API ne remplacent plus un nouveau trajet, une édition manuelle ou un changement d'activité ; le GPX reste disponible dès qu'un itinéraire est affiché.
+- **Cache POI** : cache local SQLite inchangé pour le vélo ; fichiers transitoires exclus du ZIP.
+
+**Déploiement :** envoyer les fichiers contenus dans `velo-route-planner/` à la racine du dépôt GitHub relié à Render. Ne pas recopier les anciens fichiers `routevelo_pois.sqlite3`, `*.sqlite3-wal`, `*.sqlite3-shm` ou `__pycache__`.
+
+**Services externes :** le routage dépend des serveurs publics Valhalla et du réseau OpenStreetMap. Les tests hors ligne vérifient la logique et les deux profils avec des réponses simulées ; la disponibilité du service public ne peut pas être garantie. Le réglage piéton autorise les sentiers OSM accessibles, mais ne crée pas de chemins absents de la carte.
 
 ## Utilisation locale
 
@@ -296,20 +312,3 @@ Les choix qualitatifs du profil nutrition affichent maintenant une échelle comp
 - La recherche A→B retombe sur un trajet simple si la recherche d’alternatives échoue.
 - Les détours internes utilisés pour fabriquer des alternatives ne deviennent plus de faux points utilisateur.
 - Second hôte Valhalla en secours pour les erreurs réseau temporaires.
-
-
-## V42.2 — réparation générale (sans refonte V43/V44)
-
-- Départ → arrivée : la route normale est calculée et affichée d'abord. Des variantes sont recherchées ensuite sans bloquer l'affichage et sans effacer la route courante en cas d'échec.
-- L'ajout manuel à la carte fonctionne aussi **avant** le premier calcul : premier clic = départ, deuxième clic = arrivée, puis recalcul automatique.
-- Après le calcul, chaque clic ajoute un point de passage **dans l'ordre des clics**, avec son **numéro permanent** (ex. 6 reste 6 même s'il est placé près du point 1). Les coordonnées sont transmises telles quelles au calcul.
-- Le déplacement des marqueurs, la suppression et le bouton Annuler utilisent les coordonnées éditées, sans réutiliser les anciennes valeurs des champs d'adresse. Si un recalcul échoue, le tracé précédent est conservé.
-- Les points de passage posés manuellement ne sont pas supprimés par le nettoyage des micro-détours pendant leur recalcul.
-- Le statut du calcul et les messages d'erreur sont désormais **visibles sur la carte** (PC et mobile).
-- Géocodage : secours Géoplateforme IGN si Nominatim ne répond pas, avec message clair si les deux sources échouent.
-- Meilleure gestion des délais et des erreurs réseau du moteur de routage ; pas d'alternatives Valhalla sur des requêtes à étapes multiples.
-- GPX toujours exportable lorsqu'un trajet existe ; les filtres POI restent à 400 m du tracé.
-- Les petites sorties reçoivent un message nutrition explicite quand aucun arrêt ne nécessite d'être programmé.
-- Tests hors-ligne inclus : `python -m unittest discover -s tests -v`. Tests d'interface également réalisés sur navigateur avec services externes simulés.
-
-**Important :** la géométrie réelle et les alternatives dépendent toujours du service public Valhalla. Les tests hors ligne vérifient le comportement de l'app mais ne prouvent pas la disponibilité du service public à un instant donné.

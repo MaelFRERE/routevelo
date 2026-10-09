@@ -318,10 +318,7 @@ def upstream_json(url: str, method: str = "GET", payload=None, headers=None, tim
             ctype = resp.headers.get("Content-Type", "")
             if "json" not in ctype and raw[:1] not in (b"{", b"["):
                 raise RuntimeError(f"Réponse non JSON du service distant ({resp.status}).")
-            try:
-                return json.loads(raw.decode("utf-8")), resp.status
-            except (ValueError, UnicodeDecodeError) as exc:
-                raise RuntimeError("Le service distant a renvoyé une réponse invalide.") from exc
+            return json.loads(raw.decode("utf-8")), resp.status
     except urllib.error.HTTPError as exc:
         raw = exc.read()
         detail = ""
@@ -335,8 +332,6 @@ def upstream_json(url: str, method: str = "GET", payload=None, headers=None, tim
         raise RuntimeError(detail or f"Service distant: erreur HTTP {exc.code}.") from exc
     except urllib.error.URLError as exc:
         raise RuntimeError("Impossible de joindre le service distant. Vérifiez la connexion Internet.") from exc
-    except (TimeoutError, OSError) as exc:
-        raise RuntimeError("Le service distant ne répond pas assez vite. Réessayez.") from exc
 
 
 def post_valhalla(endpoint: str, payload):
@@ -346,7 +341,7 @@ def post_valhalla(endpoint: str, payload):
     short transient gateway/DNS failures and does not change routing semantics.
     """
     last_error = None
-    for index, base in enumerate(VALHALLA_ENDPOINTS):
+    for base in VALHALLA_ENDPOINTS:
         valhalla_gate.wait()
         try:
             return upstream_json(
@@ -354,7 +349,7 @@ def post_valhalla(endpoint: str, payload):
                 method="POST",
                 payload=payload,
                 headers={"X-Client-Id": CLIENT_ID, "User-Agent": USER_AGENT},
-                timeout=35 if index == 0 else 24,
+                timeout=60,
             )[0]
         except RuntimeError as exc:
             last_error = exc
@@ -1577,7 +1572,7 @@ def valid_bbox(value):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "RouteVelo/4.2"
+    server_version = "RouteVelo/4.5"
 
     def _auth_token(self):
         return hmac.new(AUTH_SECRET.encode("utf-8"), b"routevelo-auth-v1", hashlib.sha256).hexdigest()
@@ -1670,7 +1665,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/health":
-            return self.send_json({"status": "ok", "version": "42.2", "poi_cache": local_poi_store.stats()})
+            return self.send_json({"status": "ok", "version": "45", "poi_cache": local_poi_store.stats()})
         if parsed.path == "/login":
             if self._is_authenticated():
                 return self._redirect("/")
@@ -1730,61 +1725,67 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
             return self.send_error_json("Recherche vide.", 400)
         if len(q) > 220:
             return self.send_error_json("Recherche trop longue.", 400)
-        cache_key = ("geocode-v42.2", unicodedata.normalize("NFKC", q).strip().casefold())
-        cached = _cache_get(cache_key)
+        key = ("geocode-v45", unicodedata.normalize("NFKC", q).strip().casefold())
+        cached = _cache_get(key)
         if cached is not None:
             return self.send_json(cached)
 
-        # Un point de départ/arrivée doit rester trouvable quand Nominatim
-        # refuse temporairement la requête. L'IGN est le secours en France.
-        errors = []
+        # La geolocalisation par adresse etait un point de panne majeur :
+        # quand Nominatim refuse les requetes ou depasse son delai, essayer
+        # aussi le geocodeur officiel IGN, sans cle API et sans dependance.
+        last_error = None
         try:
             nominatim_gate.wait()
             query = urllib.parse.urlencode({
-                "q": q,
-                "format": "jsonv2",
-                "limit": 1,
-                "addressdetails": 1,
-                "accept-language": "fr",
+                "q": q, "format": "jsonv2", "limit": 1,
+                "addressdetails": 1, "accept-language": "fr",
             })
             data, _ = upstream_json(
                 NOMINATIM + "/search?" + query,
                 headers={"User-Agent": USER_AGENT, "Referer": f"http://{HOST}:{self.server.server_port}/"},
-                timeout=15,
+                timeout=12,
             )
-            if isinstance(data, list) and data:
+            if data:
                 hit = data[0]
                 result = {
-                    "lat": float(hit["lat"]),
-                    "lng": float(hit["lon"]),
+                    "lat": float(hit["lat"]), "lng": float(hit["lon"]),
                     "label": hit.get("display_name") or q,
                 }
-                _cache_put(cache_key, result)
+                _cache_put(key, result)
                 return self.send_json(result)
-        except (RuntimeError, ValueError, KeyError, TypeError) as exc:
-            errors.append(str(exc))
+            last_error = "Adresse introuvable dans la première source."
+        except Exception as exc:
+            last_error = str(exc)
 
         try:
-            query = urllib.parse.urlencode({"q": q, "limit": 1})
+            ign_query = urllib.parse.urlencode({
+                "q": q, "limit": 1,
+                "autocomplete": 0,
+                "index": "address,poi",
+            })
             data, _ = upstream_json(
-                IGN_GEOCODER + "/search?" + query,
-                headers={"User-Agent": USER_AGENT}, timeout=13,
+                IGN_GEOCODER + "/search/?" + ign_query,
+                headers={"User-Agent": USER_AGENT},
+                timeout=16,
             )
-            features = data.get("features") if isinstance(data, dict) else []
+            features = data.get("features", []) if isinstance(data, dict) else []
             if features:
-                hit = features[0]
-                lon, lat = hit.get("geometry", {}).get("coordinates", [])[:2]
-                props = hit.get("properties") or {}
-                result = {"lat": float(lat), "lng": float(lon), "label": props.get("label") or q}
-                if -90 <= result["lat"] <= 90 and -180 <= result["lng"] <= 180:
-                    _cache_put(cache_key, result)
-                    return self.send_json(result)
-        except (RuntimeError, ValueError, KeyError, TypeError) as exc:
-            errors.append(str(exc))
+                feature = features[0]
+                lon, lat = feature["geometry"]["coordinates"][:2]
+                props = feature.get("properties") or {}
+                result = {
+                    "lat": float(lat), "lng": float(lon),
+                    "label": props.get("label") or props.get("name") or q,
+                }
+                _cache_put(key, result)
+                return self.send_json(result)
+        except Exception as exc:
+            last_error = str(exc) or last_error
 
-        if errors:
-            return self.send_error_json("Géocodage momentanément indisponible (Nominatim / IGN). Réessaie ou place les points sur la carte.", 502)
-        return self.send_error_json("Adresse introuvable. Essaie avec le nom de la commune ou place le point sur la carte.", 404)
+        return self.send_error_json(
+            "Adresse introuvable ou services de recherche indisponibles. Réessayez, ou placez les points directement sur la carte."
+            if last_error else "Adresse introuvable.", 502 if last_error else 404,
+        )
 
     def handle_bakery_details(self):
         payload = read_json(self, 20_000)
