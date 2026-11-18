@@ -1,6 +1,31 @@
-# RouteVelo V45
+# RouteVelo V46
 
 Planificateur d’itinéraires **Vélo de route** et **Course à pied** : choix de l’activité sur l’écran d’accueil, boucles, itinéraires A→B / aller-retour, points manuels et export GPX.
+
+## V46 — Course à pied et numérotation
+
+- **D+ et D−**, profil d’élévation interactif et mini-carte synchronisée disponibles aussi en course à pied.
+- **Types de voie** : routes, chemins, sentiers / voies piétonnes, pistes cyclables, escaliers et voies non renseignées. Répartition en pourcentage de la distance et couleurs correspondantes sur la carte.
+- **Évitement** : activer les boutons souhaités avant de calculer. Une modification des exclusions efface le résultat précédent ; relancer ensuite le calcul A→B ou les boucles. Les exclusions restent mémorisées pendant la session.
+- Les parcours et leurs variantes sont contrôlés via le profil piéton. Si une voie exclue est détectée, le calcul recherche jusqu’à trois détours avec les segments concernés exclus. Un résultat encore incompatible, ou dont les voies ne permettent pas de vérifier les exclusions, n’est pas proposé. Un point imposé sur une voie exclue peut rendre le calcul impossible.
+- **Points 1 à N** sur chaque parcours, pour les deux activités : changer de variante ne fait plus augmenter le compteur. Après ajout ou suppression, les numéros suivent l’ordre du trajet ; déplacer un point conserve son numéro.
+
+Les catégories représentent les types de voie cartographiés, pas une mesure du revêtement. Une voie piétonne peut être un sentier ou un trottoir. Les données proviennent d’OpenStreetMap via Valhalla. Leur disponibilité conditionne le profil et l’analyse des voies ; les altitudes manquantes ne sont pas remplacées par zéro.
+
+### Vérifications V46
+
+Depuis le dossier de l’application :
+
+```bash
+python3 -m unittest discover -s tests -v
+node --test tests/test_client.cjs
+```
+
+Le lancement de l’application ne nécessite toujours que Python. Node.js est nécessaire uniquement pour exécuter les tests du client.
+
+Validation effectuée : 3 tests serveur et 12 tests client hors ligne, avec réponses cartographiques simulées, ainsi que la syntaxe JavaScript et l’unicité des identifiants HTML. Les services cartographiques réels et le rendu dans un navigateur n’ont pas pu être validés dans cet environnement.
+
+Références techniques : [routage Valhalla](https://valhalla.github.io/valhalla/api/route/api-reference/), [attributs des voies](https://valhalla.github.io/valhalla/api/map-matching/).
 
 ## Utilisation locale
 

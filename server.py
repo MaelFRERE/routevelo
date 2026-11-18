@@ -1665,7 +1665,7 @@ button{{width:100%;min-height:50px;margin-top:12px;border:0;border-radius:13px;b
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/health":
-            return self.send_json({"status": "ok", "version": "45", "poi_cache": local_poi_store.stats()})
+            return self.send_json({"status": "ok", "version": "46", "poi_cache": local_poi_store.stats()})
         if parsed.path == "/login":
             if self._is_authenticated():
                 return self._redirect("/")

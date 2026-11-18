@@ -1,13 +1,13 @@
 <!doctype html>
-<!-- RouteVelo V45 -->
+<!-- RouteVelo V46 -->
 <html lang="fr">
 <head>
-  <!-- RouteVelo V45 -->
+  <!-- RouteVelo V46 -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteVelo - Choisir une activité</title>
   <meta name="theme-color" content="#7c3aed" />
-  <meta name="routevelo-version" content="45" />
+  <meta name="routevelo-version" content="46" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -1360,10 +1360,8 @@
     body[data-sport="run"] .summary-stat { border-color:#cfeae0; background:#f6fdfa; }
     body[data-sport="run"] .route-choice.active { border-color:#0b9b89; background:#eafaf3; }
     body[data-sport="run"] .btn-soft { background:#e8f8f1; color:#087e72; border-color:#c6efdf; }
-    body[data-sport="run"] #ascendCard, body[data-sport="run"] #descendCard,
-    body[data-sport="run"] #elevationPanel, body[data-sport="run"] #roadTypePanel,
     body[data-sport="run"] #nutritionOpenBtn { display:none !important; }
-    body[data-sport="run"] .map-summary-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    body[data-sport="run"] .map-summary-stats { grid-template-columns:repeat(4,minmax(0,1fr)); }
     body[data-sport="run"] .details-head p { max-width:620px; }
     @media(max-width:680px) {
       .sport-home { align-items:start; padding:25px 16px 42px; }
@@ -1374,6 +1372,18 @@
       .sport-choice-title { font-size:22px; }
     }
 
+    .run-terrain-controls { display:none; }
+    body[data-sport="run"] .run-terrain-controls { display:grid; gap:9px; }
+    .terrain-buttons { display:flex; flex-wrap:wrap; gap:7px; }
+    .terrain-button { border:1px solid var(--line); border-radius:10px; padding:9px 10px; background:#fff; color:var(--text); font:inherit; font-size:12px; font-weight:750; cursor:pointer; }
+    .terrain-button[aria-pressed="true"] { background:#fff1ef; color:#a1382d; border-color:#e6a39b; }
+    .terrain-button[aria-pressed="true"]::before { content:'✕ '; }
+    .terrain-button:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+    body[data-sport="run"] .elevation-line { stroke:var(--accent); }
+    body[data-sport="run"] .roadtype-label { white-space:normal; overflow-wrap:anywhere; }
+    body[data-sport="run"] .roadtype-row { grid-template-columns:minmax(95px,1.3fr) 1fr 38px; }
+    body[data-sport="run"] .elevation-grid { stroke:#d9efe8; }
+    body[data-sport="run"] .elevation-chart-shell { background:#f6fdfa; border-color:#d9efe8; }
   </style>
 </head>
 <body class="sport-home-active" data-sport="bike">
@@ -1449,6 +1459,19 @@
             <button id="generateLoopBtn" class="btn btn-primary" type="button">Proposer 3 boucles</button>
           </div>
           <div id="loopExplainer" class="note">3 boucles sont recherchées sans aller-retour. Les petits décrochements parasites sont coupés automatiquement sur tous les parcours.</div>
+        </div>
+
+        <div class="run-terrain-controls" role="group" aria-labelledby="terrainTitle">
+          <div id="terrainTitle" class="section-title">Types de voie à éviter</div>
+          <div class="terrain-buttons">
+            <button type="button" class="terrain-button" data-avoid-terrain="road" aria-pressed="false">Routes</button>
+            <button type="button" class="terrain-button" data-avoid-terrain="track" aria-pressed="false">Chemins</button>
+            <button type="button" class="terrain-button" data-avoid-terrain="path" aria-pressed="false">Sentiers / voies piétonnes</button>
+            <button type="button" class="terrain-button" data-avoid-terrain="cycleway" aria-pressed="false">Pistes cyclables</button>
+            <button type="button" class="terrain-button" data-avoid-terrain="steps" aria-pressed="false">Escaliers</button>
+          </div>
+          <div id="terrainHelp" class="note" role="status" aria-live="polite">Aucune exclusion. Active un bouton pour éviter ce type de voie, puis calcule ton parcours.</div>
+          <div class="note">Les voies sont classées selon les données cartographiques disponibles. Si aucun détour compatible n’est trouvé, ajuste tes exclusions ou tes points.</div>
         </div>
 
         <button id="calculateBtn" class="btn btn-primary full" type="button">Calculer des itinéraires</button>
@@ -1678,7 +1701,7 @@
   <script>
     (() => {
       'use strict';
-      // RouteVelo V45
+      // RouteVelo V46
 
       const API_BASE = '/api';
       const MAX_POI_DISTANCE_M = 400;
@@ -1771,7 +1794,8 @@
       const state = {
         mode: 'ab',
         sport: 'bike',
-        nextWaypointNumber: 1,
+        avoidedTerrain: new Set(),
+        routeAuditCache: new Map(),
         waypoints: [],
         waypointHistory: [],
         markers: [],
@@ -1841,7 +1865,6 @@
         state.sport = sport;
         document.body.dataset.sport = sport;
         document.body.classList.remove('sport-home-active', 'mobile-panel-open');
-        state.nextWaypointNumber = 1;
         clearAll();
         switchMode('ab');
         els.sportBrandIcon.textContent = isRunning() ? '🏃' : '🚴';
@@ -1855,7 +1878,8 @@
         if (els.returnToStart) els.returnToStart.checked = isRunning();
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isRunning() ? '#0d998c' : '#7c3aed');
         document.querySelector('.details-head h2').textContent = isRunning() ? 'Détails de la sortie' : 'Détails du parcours';
-        document.querySelector('.details-head p').textContent = isRunning() ? 'Distance, durée et export GPX : le nécessaire pour ton parcours à pied.' : 'Fais défiler la page pour retrouver le profil d’élévation, le type de route et le plan nutritionnel.';
+        document.querySelector('.details-head p').textContent = isRunning() ? 'Retrouve le D+, le D−, le profil d’élévation et les types de voie de ta sortie.' : 'Fais défiler la page pour retrouver le profil d’élévation, le type de route et le plan nutritionnel.';
+        document.querySelector('.roadtype-title').textContent = isRunning() ? 'Types de voie' : 'Type de route';
         els.loopDistance.min = isRunning() ? '2' : '10';
         els.loopDistance.max = isRunning() ? '60' : '350';
         els.loopDistance.step = isRunning() ? '1' : '5';
@@ -2152,32 +2176,47 @@
         if (els.roadTypeBars) els.roadTypeBars.innerHTML = '';
       }
 
+      const TERRAIN_TYPES = {
+        road: { label: 'Routes', color: '#7c3aed' },
+        track: { label: 'Chemins', color: '#b7791f' },
+        path: { label: 'Sentiers / voies piétonnes', color: '#0d998c' },
+        cycleway: { label: 'Pistes cyclables', color: '#16a34a' },
+        steps: { label: 'Escaliers', color: '#db2777' },
+        other: { label: 'Autre / non renseigné', color: '#64748b' }
+      };
+
+      function terrainKey(edge) {
+        const use = normalizeRoadUse(edge.use);
+        if (['road', 'ramp', 'turn_channel', 'culdesac', 'service_road', 'alley', 'driveway', 'living_street', 'parking_aisle', 'emergency_access', 'drive_through'].includes(use)) return 'road';
+        if (['track', 'mountain_bike'].includes(use)) return 'track';
+        if (['path', 'footway', 'pedestrian', 'bridleway', 'sidewalk'].includes(use)) return 'path';
+        if (use === 'cycleway') return 'cycleway';
+        if (['steps', 'stairs'].includes(use)) return 'steps';
+        return 'other';
+      }
+
       function renderRoadTypeBreakdown(edges) {
         if (!els.roadTypePanel || !els.roadTypeBars || !Array.isArray(edges) || !edges.length) return;
-        const groups = new Map([['Route', 0], ['Piste cyclable', 0], ['Voie de service', 0], ['Autre', 0]]);
+        const groups = new Map();
         let total = 0;
         for (const edge of edges) {
-          const use = String(edge.use || '').toLowerCase().replace(/-/g, '_');
-          const rawLength = Number(edge.length);
-          const weight = Number.isFinite(rawLength) && rawLength > 0 ? rawLength : 1;
-          let key = 'Autre';
-          if (use === 'cycleway') key = 'Piste cyclable';
-          else if (use === 'service_road') key = 'Voie de service';
-          else if (['road', 'ramp', 'turn_channel', 'culdesac'].includes(use)) key = 'Route';
+          const use = normalizeRoadUse(edge.use);
+          const key = isRunning() ? terrainKey(edge) : (use === 'cycleway' ? 'Piste cyclable' : use === 'service_road' ? 'Voie de service' : ['road', 'ramp', 'turn_channel', 'culdesac'].includes(use) ? 'Route' : 'Autre');
+          const weight = Number(edge.length);
+          if (!Number.isFinite(weight) || weight <= 0) continue;
           groups.set(key, (groups.get(key) || 0) + weight);
           total += weight;
         }
-        if (!(total > 0)) return;
+        if (!(total > 0)) throw new Error('Longueur des segments indisponible.');
         const palette = { 'Route':'#7c3aed', 'Piste cyclable':'#16a34a', 'Voie de service':'#f59e0b', 'Autre':'#64748b' };
-        const rows = [...groups.entries()]
-          .map(([label, value]) => ({ label, pct: value / total * 100 }))
-          .filter(item => item.pct >= 0.5)
-          .sort((a, b) => b.pct - a.pct);
-        els.roadTypeBars.innerHTML = rows.map(item => {
-          const pct = Math.round(item.pct);
-          return `<div class="roadtype-row"><span class="roadtype-label">${item.label}</span><span class="roadtype-track"><span class="roadtype-fill" style="width:${Math.max(1, item.pct).toFixed(1)}%;background:${palette[item.label] || '#94a3b8'}"></span></span><span class="roadtype-value">${pct}%</span></div>`;
+        const rows = [...groups.entries()].sort((a,b) => b[1] - a[1]);
+        els.roadTypeBars.innerHTML = rows.map(([key, value]) => {
+          const pct = value / total * 100;
+          const label = isRunning() ? TERRAIN_TYPES[key].label : key;
+          const color = isRunning() ? TERRAIN_TYPES[key].color : palette[key];
+          return `<div class="roadtype-row"><span class="roadtype-label">${label}</span><span class="roadtype-track"><span class="roadtype-fill" style="width:${pct.toFixed(2)}%;background:${color}"></span></span><span class="roadtype-value">${pct < 1 ? '&lt;1' : Math.round(pct)}%</span></div>`;
         }).join('');
-        els.roadTypePanel.classList.toggle('hidden', !rows.length);
+        els.roadTypePanel.classList.remove('hidden');
       }
 
       const NUTRITION_STORAGE_KEY = 'routevelo-nutrition-v2';
@@ -2503,6 +2542,7 @@
 
       function roadUseColor(use) {
         const value = normalizeRoadUse(use);
+        if (isRunning()) return TERRAIN_TYPES[terrainKey({ use })].color;
         if (value === 'cycleway') return '#16a34a';
         if (value === 'service_road') return '#f59e0b';
         if (['road', 'ramp', 'turn_channel', 'culdesac'].includes(value)) return '#7c3aed';
@@ -2516,9 +2556,8 @@
         }
       }
 
-      function renderRoadTypeOnRoute(edges) {
+      function renderRoadTypeOnRoute(edges, coords = state.routeCoords) {
         clearRouteTypeOverlay();
-        const coords = state.routeCoords;
         if (!Array.isArray(edges) || !edges.length || !Array.isArray(coords) || coords.length < 2) return;
         const indexed = [];
         for (const edge of edges) {
@@ -2718,11 +2757,11 @@
         state.markers.forEach(m => map.removeLayer(m));
         state.markers = [];
         state.waypoints.forEach((wp, i) => {
-          if (!Number.isInteger(wp.sequence)) wp.sequence = state.nextWaypointNumber++;
+          wp.sequence = i + 1;
           // Pendant une édition, le marqueur doit rester exactement là où
           // l'utilisateur l'a posé. Il ne sera recollé au NOUVEAU tracé
           // qu'une fois le recalcul terminé avec succès.
-          const marker = L.marker([wp.lat, wp.lng], { draggable: true, icon: markerIcon(i), autoPan: true, bubblingMouseEvents: false }).addTo(map);
+          const marker = L.marker([wp.lat, wp.lng], { draggable: true, title: `Point ${i + 1}`, alt: `Point ${i + 1}`, icon: markerIcon(i), autoPan: true, bubblingMouseEvents: false }).addTo(map);
           marker.on('dragstart', () => {
             state.manualEditInProgress = true;
             state.requestSerial++;
@@ -2733,7 +2772,7 @@
           marker.on('dragend', () => {
             const p = marker.getLatLng();
             rememberWaypoints();
-            state.waypoints[i] = { lat: p.lat, lng: p.lng };
+            state.waypoints[i] = { lat: p.lat, lng: p.lng, sequence: i + 1 };
             state.manualEditInProgress = true;
             renderWaypointList();
             marker.setZIndexOffset(2500);
@@ -2803,7 +2842,6 @@
       function clearAll() {
         state.waypoints = [];
         state.waypointHistory = [];
-        state.nextWaypointNumber = 1;
         updateUndoButton();
         state.markers.forEach(m => map.removeLayer(m));
         state.markers = [];
@@ -2844,7 +2882,7 @@
 
       function addPoint(latlng) {
         if (!Number.isFinite(latlng?.lat) || !Number.isFinite(latlng?.lng)) return;
-        const wp = { lat: latlng.lat, lng: latlng.lng, sequence: state.nextWaypointNumber++ };
+        const wp = { lat: latlng.lat, lng: latlng.lng, sequence: state.waypoints.length + 1 };
         const isLoop = state.mode === 'loop';
         const hasComputedRoute = !!state.routeLayer && state.routeCoords.length >= 2;
         if (isLoop && !hasComputedRoute && !state.waypoints.length) {
@@ -3214,17 +3252,17 @@
       }
 
       function normalizeRoute(data, options = {}) {
-        return normalizeTrip(data && data.trip, data, options);
+        return normalizeTrip(data && data.trip, data, { ...options, preserveWaypoints: isRunning() || options.preserveWaypoints });
       }
 
       function normalizeRouteSet(data) {
         const routes = [];
         if (data && data.trip) {
-          try { routes.push(normalizeTrip(data.trip, data)); } catch (_) {}
+          try { routes.push(normalizeTrip(data.trip, data, { preserveWaypoints: isRunning() })); } catch (_) {}
         }
         for (const alt of (data && Array.isArray(data.alternates) ? data.alternates : [])) {
           const trip = alt && alt.trip ? alt.trip : alt;
-          try { routes.push(normalizeTrip(trip, alt)); } catch (_) {}
+          try { routes.push(normalizeTrip(trip, alt, { preserveWaypoints: isRunning() })); } catch (_) {}
         }
         return routes;
       }
@@ -3259,6 +3297,7 @@
           directions_options: { units: 'kilometers', language: 'fr-FR' },
           shape_format: 'polyline6'
         };
+        if (foot && options.excludeLocations?.length) payload.exclude_locations = options.excludeLocations;
         if (Number.isInteger(options.alternates) && options.alternates > 0) payload.alternates = options.alternates;
         const data = await apiJson('/route', {
           method: 'POST',
@@ -3270,11 +3309,70 @@
       }
 
       async function fetchSingleRoute(serial, options = {}) {
-        return normalizeRoute(await fetchRouteData(serial, options), { preserveWaypoints: !!options.preserveWaypoints });
+        const route = normalizeRoute(await fetchRouteData(serial, options), { preserveWaypoints: !!options.preserveWaypoints });
+        return enforceTerrainAvoidance(route, serial, options);
       }
 
       async function fetchRouteAlternatives(serial, options = {}) {
-        return normalizeRouteSet(await fetchRouteData(serial, { ...options, alternates: options.alternates ?? 2 }));
+        const routes = normalizeRouteSet(await fetchRouteData(serial, { ...options, alternates: options.alternates ?? 2 }));
+        const accepted = [];
+        let lastError;
+        for (const route of routes) {
+          try { accepted.push(await enforceTerrainAvoidance(route, serial, options)); }
+          catch (err) {
+            if (serial !== state.requestSerial) throw err;
+            lastError = err;
+          }
+        }
+        if (!accepted.length && lastError) throw lastError;
+        return distinctRoutes(accepted);
+      }
+
+      function assertCurrentRequest(serial) {
+        if (serial !== state.requestSerial) throw new Error('Requête remplacée par une plus récente.');
+      }
+
+      async function getRouteAudit(route, serial) {
+        let data;
+        try { data = await requestRouteAudit(route, 'edge_walk'); }
+        catch (err) {
+          assertCurrentRequest(serial);
+          data = await requestRouteAudit(route, 'walk_or_snap');
+        }
+        assertCurrentRequest(serial);
+        if (!Array.isArray(data.edges) || !data.edges.length) throw new Error('Types de voie indisponibles. Réessaie le calcul.');
+        return data;
+      }
+
+      async function enforceTerrainAvoidance(route, serial, options) {
+        if (!isRunning() || !state.avoidedTerrain.size) return route;
+        const excluded = new Map();
+        // Quatre contrôles au maximum : le premier tracé puis trois détours.
+        // Un résultat encore incompatible n’est jamais proposé silencieusement.
+        for (let attempt = 0; attempt < 4; attempt++) {
+          assertCurrentRequest(serial);
+          const audit = await getRouteAudit(route, serial);
+          const forbidden = audit.edges.filter(edge => state.avoidedTerrain.has(terrainKey(edge)));
+          if (!forbidden.length) {
+            if (audit.edges.some(edge => terrainKey(edge) === 'other')) throw new Error('Certaines voies ne sont pas renseignées : impossible de vérifier tes exclusions.');
+            return route;
+          }
+          if (attempt === 3) break;
+          const coords = audit.shape ? decodePolyline6(audit.shape) : route.coords;
+          for (const edge of forbidden) {
+            const begin = Number(edge.begin_shape_index), end = Number(edge.end_shape_index);
+            if (!Number.isInteger(begin) || !Number.isInteger(end) || begin < 0 || end <= begin || end >= coords.length) continue;
+            // Point au milieu d’un segment réel, sans couper les virages.
+            const i = Math.min(end - 1, Math.floor((begin + end) / 2));
+            const lon = (coords[i][0] + coords[i+1][0]) / 2;
+            const lat = (coords[i][1] + coords[i+1][1]) / 2;
+            excluded.set(`${lon.toFixed(6)},${lat.toFixed(6)}`, { lat, lon });
+          }
+          if (!excluded.size || excluded.size > 50) break;
+          setStatus(`Recherche d’un détour évitant les voies sélectionnées… ${attempt + 1}/3`);
+          route = normalizeRoute(await fetchRouteData(serial, { ...options, alternates: 0, excludeLocations: [...excluded.values()] }), { preserveWaypoints: true });
+        }
+        throw new Error('Aucun parcours compatible avec tes exclusions trouvé. Ajuste les types de voie à éviter ou déplace tes points.');
       }
 
       function renderRoute(route) {
@@ -3383,24 +3481,37 @@
       }
 
       async function requestRouteAudit(route, shapeMatch) {
-        return apiJson('/trace', {
+        const foot = isRunning();
+        const key = `${foot ? 'run' : 'bike'}:${shapeMatch}:${route.encoded}`;
+        if (state.routeAuditCache.has(key)) return state.routeAuditCache.get(key);
+        const data = await apiJson('/trace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             encoded_polyline: route.encoded,
             shape_match: shapeMatch,
-            costing: 'bicycle',
-            costing_options: { bicycle: bicycleCosting() },
+            costing: foot ? 'pedestrian' : 'bicycle',
+            costing_options: foot ? { pedestrian: pedestrianCosting() } : { bicycle: bicycleCosting() },
             filters: {
               action: 'include',
-              attributes: ['edge.use', 'edge.surface', 'edge.unpaved', 'edge.length', 'edge.way_id', 'edge.begin_shape_index', 'edge.end_shape_index']
+              attributes: ['shape', 'edge.use', 'edge.surface', 'edge.unpaved', 'edge.length', 'edge.way_id', 'edge.begin_shape_index', 'edge.end_shape_index']
             }
           })
         });
+        if (state.routeAuditCache.size >= 32) state.routeAuditCache.delete(state.routeAuditCache.keys().next().value);
+        state.routeAuditCache.set(key, data);
+        return data;
       }
 
       async function auditRoute(route, serial) {
-        if (isRunning()) { state.routeSafe = true; return; }
+        if (isRunning()) {
+          const data = await getRouteAudit(route, serial);
+          renderRoadTypeBreakdown(data.edges);
+          renderRoadTypeOnRoute(data.edges, data.shape ? decodePolyline6(data.shape) : route.coords);
+          state.routeSafe = true;
+          setStatus(state.avoidedTerrain.size ? 'Parcours à pied prêt. Types de voie à éviter vérifiés.' : 'Parcours à pied prêt. Types de voie affichés sur la carte.', 'ok');
+          return;
+        }
         let data;
         let usedFallback = false;
         try {
@@ -3417,7 +3528,7 @@
           throw new Error('Le contrôle du revêtement n’a retourné aucun segment.');
         }
         renderRoadTypeBreakdown(edges);
-        renderRoadTypeOnRoute(edges);
+        renderRoadTypeOnRoute(edges, data.shape ? decodePolyline6(data.shape) : route.coords);
         const problems = [];
         let unknown = 0;
         for (const edge of edges) {
@@ -3464,7 +3575,6 @@
       }
 
       async function loadElevation(route, serial) {
-        if (isRunning()) { resetElevationProfile(); resetRoadTypeBreakdown(); return; }
         try {
           const sampled = sampleForElevation(route.coords);
           const data = await apiJson('/height', {
@@ -3473,8 +3583,9 @@
             body: JSON.stringify({ shape: sampled.map(c => ({ lon: c[0], lat: c[1] })), height_precision: 1 })
           });
           if (serial !== state.requestSerial) return;
-          const heights = smoothHeights((data.height || []).map(Number));
-          if (heights.length < 2) throw new Error('profil absent');
+          const values = (data.height || []).map(h => h === null || h === '' ? NaN : Number(h));
+          if (values.length !== sampled.length || values.filter(Number.isFinite).length < 2) throw new Error('profil absent');
+          const heights = smoothHeights(values);
           let up = 0, down = 0;
           for (let i = 1; i < heights.length; i++) {
             if (!Number.isFinite(heights[i]) || !Number.isFinite(heights[i - 1])) continue;
@@ -3540,7 +3651,7 @@
         updateUndoButton();
         const serial = ++state.requestSerial;
         renderRoute(route);
-        setStatus(`${route.label || 'Itinéraire'} sélectionné. Vérification du revêtement…`);
+        setStatus(`${route.label || 'Itinéraire'} sélectionné. Analyse des types de voie…`);
         loadPoisNearRoute(serial).catch(() => {});
         auditRoute(route, serial).catch((err) => {
           if (serial === state.requestSerial) {
@@ -3579,7 +3690,7 @@
           route.waypoints = currentWaypoints;
           if (serial !== state.requestSerial) return false;
           renderRoute(route);
-          setStatus('Tracé modifié. Vérification stricte du revêtement…');
+          setStatus('Tracé modifié. Analyse des types de voie…');
           loadPoisNearRoute(serial).catch(() => {});
           auditRoute(route, serial).catch((err) => {
             if (serial === state.requestSerial) {
@@ -3793,7 +3904,6 @@
         const [start, end] = await Promise.all([startPromise, geocode(endQuery)]);
         if (serial !== state.requestSerial) throw new Error('Requête remplacée par une plus récente.');
         rememberWaypoints();
-        state.nextWaypointNumber = 3;
         state.waypoints = [{ ...start, sequence: 1 }, { ...end, sequence: 2 }];
         refreshWaypointMarkers();
         return cloneWaypoints(state.waypoints);
@@ -3843,7 +3953,7 @@
           if (serial !== state.requestSerial) return false;
           primary.waypoints = cloneWaypoints(baseWaypoints);
           setRouteOptions([primary]);
-          setStatus('Parcours calculé. Clique sur la carte pour ajouter des points dans l’ordre où tu les poses.', 'ok');
+          setStatus('Parcours calculé. Clique sur la carte pour ajouter des points dans l’ordre du trajet.', 'ok');
           const extendedSerial = state.requestSerial;
           if (!roundTrip) updateExtraABAlternatives(baseWaypoints, primary, extendedSerial);
           return true;
@@ -4179,7 +4289,7 @@
           state.loopSeed += 37;
           const ranked = rankLoopCandidates(candidates, start, targetKm);
           if (!ranked.length) {
-            throw new Error('Impossible de créer une boucle routable depuis ce départ. Essayez une autre distance ou une autre ville.');
+            throw new Error(isRunning() && state.avoidedTerrain.size ? 'Aucune boucle compatible avec tes exclusions trouvée. Ajuste les types de voie à éviter, le départ ou la distance.' : 'Impossible de créer une boucle routable depuis ce départ. Essayez une autre distance ou une autre ville.');
           }
 
           // V27 : on n'affiche plus de boucle contenant un vrai aller-retour.
@@ -4809,6 +4919,21 @@
         setTimeout(() => map.invalidateSize(), 260);
       }
 
+      document.querySelectorAll('[data-avoid-terrain]').forEach(button => {
+        button.addEventListener('click', () => {
+          const key = button.dataset.avoidTerrain;
+          if (state.avoidedTerrain.has(key)) state.avoidedTerrain.delete(key);
+          else state.avoidedTerrain.add(key);
+          button.setAttribute('aria-pressed', String(state.avoidedTerrain.has(key)));
+          document.getElementById('terrainHelp').textContent = state.avoidedTerrain.size
+            ? 'À éviter : ' + [...state.avoidedTerrain].map(k => TERRAIN_TYPES[k].label).join(', ') + '.'
+            : 'Aucune exclusion. Tous les types de voie sont autorisés.';
+          state.requestSerial++;
+          clearTimeout(state.recalcTimer);
+          clearRouteOnly();
+          setStatus('Préférences mises à jour. Calcule un nouveau parcours pour les appliquer.', 'ok');
+        });
+      });
       document.getElementById('chooseBike')?.addEventListener('click', () => setSport('bike'));
       document.getElementById('chooseRun')?.addEventListener('click', () => setSport('run'));
       document.getElementById('backHomeBtn')?.addEventListener('click', showSportHome);
